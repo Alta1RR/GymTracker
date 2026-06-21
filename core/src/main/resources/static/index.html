@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GymTracker Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- Шрифты и современный пак иконок Remix Icon -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet" />
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-[#0F1115] text-[#F3F4F6] antialiased pb-28">
+
+<div id="app" class="max-w-md mx-auto p-4 min-h-screen flex flex-col justify-between" v-cloak>
+
+    <!-- ================= TAB 1: WORKOUTS (MAIN MENU) ================= -->
+    <div v-if="activeTab === 'workouts'" class="flex-grow flex flex-col justify-between">
+
+        <!-- SUB-SCREEN: MENU -->
+        <div v-if="workoutSubScreen === 'menu'" class="flex-grow flex flex-col justify-between py-6">
+            <div class="space-y-6 text-center mt-12">
+                <div class="inline-flex p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-blue-500 text-3xl mb-2 shadow-xl shadow-blue-500/5">
+                    <i class="ri-pulse-fill"></i>
+                </div>
+                <h1 class="text-3xl font-extrabold tracking-tight text-white uppercase">Gym<span class="text-blue-500">Tracker</span></h1>
+                <p class="text-zinc-400 text-sm px-8">Привет, <span class="text-white font-semibold">{{ telegramUser }}</span>. Твой персональный центр управления прогрессом готов.</p>
+            </div>
+
+            <div class="space-y-4 my-12">
+                <button @click="openTemplatesScreen"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl flex items-center justify-between transition-all active:scale-[0.99] shadow-lg shadow-blue-600/10">
+                    <span class="text-base tracking-wide flex items-center">
+                        <i class="ri-play-fill mr-2 text-lg"></i> Начать тренировку
+                    </span>
+                    <i class="ri-arrow-right-line text-lg"></i>
+                </button>
+
+                <button @click="openConstructor"
+                        class="w-full bg-[#16171D] hover:bg-[#1C1E26] border border-[#22242D] text-zinc-200 font-semibold py-4 px-6 rounded-xl flex items-center justify-between transition-all active:scale-[0.99]">
+                    <span class="text-base flex items-center">
+                        <i class="ri-add-circle-line mr-2 text-lg text-zinc-400"></i> Создать свой шаблон
+                    </span>
+                    <span class="text-[9px] bg-[#22242D] text-zinc-400 px-2 py-0.5 rounded uppercase tracking-wider font-bold">NEW</span>
+                </button>
+            </div>
+            <div class="text-center text-[10px] text-zinc-600 uppercase tracking-widest font-bold">PRO EDITION • API ACTIVE</div>
+        </div>
+
+        <!-- SUB-SCREEN: TEMPLATES LIST -->
+        <div v-if="workoutSubScreen === 'templates'" class="py-2">
+            <div class="flex items-center space-x-2 mb-6">
+                <button @click="workoutSubScreen = 'menu'" class="text-zinc-400 hover:text-white text-sm flex items-center">
+                    <i class="ri-arrow-left-line mr-1"></i> Назад в меню
+                </button>
+            </div>
+
+            <h2 class="text-xl font-bold tracking-tight text-white mb-6">Выбор программы</h2>
+
+            <div v-if="loadingPrograms" class="text-center text-zinc-500 py-10">Загрузка твоих сплитов...</div>
+
+            <div v-else class="space-y-6">
+                <!-- Кастомные программы -->
+                <div v-for="prog in customPrograms" :key="prog.id" class="space-y-3 bg-[#16171D] p-4 rounded-2xl border border-[#22242D]">
+                    <div class="flex justify-between items-center pb-2 border-b border-[#22242D]">
+                        <span class="text-xs text-zinc-400 uppercase tracking-wider font-extrabold flex items-center">
+                            <i class="ri-folder-shield-2-line mr-1.5 text-blue-500"></i> {{ prog.name }}
+                        </span>
+                        <button @click="deleteProgram(prog.id, prog.name)" class="text-red-500/80 hover:text-red-400 transition-colors text-xs font-semibold p-1 flex items-center">
+                            <i class="ri-delete-bin-6-line mr-1"></i> Удалить
+                        </button>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div v-for="(temp, tempIndex) in prog.templates" :key="temp.id"
+                             @click="openWorkoutPreview(prog, temp)"
+                             class="bg-[#1C1E26] hover:bg-[#22242D] p-4 rounded-xl border border-[#22242D]/60 cursor-pointer transition-all active:scale-[0.99] flex justify-between items-center">
+                            <div>
+                                <h4 class="font-bold text-sm text-white">{{ temp.name }}</h4>
+                                <p class="text-[11px] text-zinc-500 mt-0.5 flex items-center">
+                                    <i class="ri-list-check-3 mr-1"></i> Упражнений: {{ temp.templates ? temp.templates.length : 0 }}
+                                </p>
+                            </div>
+                            <div class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-sm"
+                                 :class="getBadgeBg(tempIndex)">
+                                {{ getInitials(temp.name) }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <button @click="openAddDayOnly(prog)"
+                            class="w-full mt-1 bg-[#1C1E26] hover:bg-[#22242D] text-zinc-400 hover:text-white text-xs py-3 rounded-xl border border-dashed border-[#22242D] transition-all font-bold flex items-center justify-center">
+                        <i class="ri-add-line mr-1.5"></i> Добавить день в программу
+                    </button>
+                </div>
+
+                <!-- Стандартные шаблоны -->
+                <div class="text-xs text-zinc-500 uppercase tracking-wider font-bold mt-8 mb-2 px-1">Стандартные тренировки</div>
+                <div v-for="(temp, index) in predefinedTemplates" :key="temp.id"
+                     @click="openWorkoutPreview(null, temp)"
+                     class="bg-[#16171D] hover:bg-[#1C1E26] p-5 rounded-2xl border border-[#22242D] cursor-pointer transition-all active:scale-[0.99] flex justify-between items-center">
+                    <div class="space-y-1 pr-4">
+                        <h3 class="font-bold text-base text-white">{{ temp.name }}</h3>
+                        <p class="text-xs text-zinc-400 leading-snug">{{ temp.description }}</p>
+                        <div class="flex flex-wrap gap-1.5 pt-2">
+                            <span v-for="exName in temp.exerciseNames" :key="exName" class="text-[9px] bg-[#22242D] text-zinc-300 px-2 py-0.5 rounded font-medium">
+                                {{ exName }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-sm"
+                         :class="getBadgeBg(index + 3)">
+                        {{ getInitials(temp.name) }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SUB-SCREEN: CONSTRUCTOR -->
+        <div v-if="workoutSubScreen === 'constructor'" class="py-2">
+            <div class="flex items-center space-x-2 mb-6">
+                <button @click="workoutSubScreen = 'templates'" class="text-zinc-400 hover:text-white text-sm flex items-center">
+                    <i class="ri-arrow-left-line mr-1"></i> Отмена
+                </button>
+            </div>
+
+            <h2 class="text-xl font-bold tracking-tight text-white mb-6">
+                {{ isAddingDayOnly ? 'Новый тренировочный день' : 'Создание программы' }}
+            </h2>
+
+            <div class="space-y-4">
+                <div v-if="!isAddingDayOnly" class="space-y-4">
+                    <div>
+                        <label class="block text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1.5">Название программы</label>
+                        <input type="text" v-model="newProgramName" placeholder="Например: Моя сушка, Силовой цикл"
+                               class="w-full bg-[#16171D] border border-[#22242D] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1.5">Метод расчета весов</label>
+                        <select v-model="newProgramType"
+                                class="w-full bg-[#16171D] border border-[#22242D] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 transition-colors text-zinc-300">
+                            <option value="MANUAL">Вручную (Блокнот)</option>
+                            <option value="LINEAR">Линейная прогрессия (+2.5кг)</option>
+                            <option value="PERIODIZED">Периодизация (Циклы)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1.5">Название тренировочного дня</label>
+                    <input type="text" v-model="newTemplateName" placeholder="Например: День А - Верх, День ног"
+                           class="w-full bg-[#16171D] border border-[#22242D] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                </div>
+
+                <div>
+                    <label class="block text-xs text-zinc-500 uppercase font-bold tracking-wider mb-1">Поиск упражнения</label>
+                    <input type="text" v-model="searchQuery" placeholder="Начни вводить: Жим, Присед, Тяга..."
+                           class="w-full bg-[#16171D] border border-[#22242D] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-blue-500 transition-colors mb-3">
+
+                    <div class="grid grid-cols-2 gap-2 mb-3">
+                        <div>
+                            <select v-model="filterCategory" class="w-full bg-[#16171D] border border-[#22242D] rounded-lg px-2.5 py-2 text-[11px] focus:outline-none focus:border-blue-500 text-zinc-400">
+                                <option value="">Все группы мышц</option>
+                                <option v-for="cat in uniqueCategories" :key="cat" :value="cat">
+                                    {{ translateCategory(cat) }}
+                                </option>
+                            </select>
+                        </div>
+                        <div>
+                            <select v-model="filterEquipment" class="w-full bg-[#16171D] border border-[#22242D] rounded-lg px-2.5 py-2 text-[11px] focus:outline-none focus:border-blue-500 text-zinc-400 capitalize">
+                                <option value="">Весь инвентарь</option>
+                                <option v-for="eq in uniqueEquipments" :key="eq" :value="eq">
+                                    {{ eq }}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <label class="block text-[10px] text-zinc-600 uppercase font-bold tracking-wider mb-1.5">
+                        Найдено {{ filteredExercises.length }} совпадений (всего {{ allExercises.length }})
+                    </label>
+
+                    <div class="bg-[#16171D] rounded-xl border border-[#22242D] divide-y divide-[#22242D] max-h-56 overflow-y-auto">
+                        <label v-for="ex in filteredExercises" :key="ex.id" class="flex items-center justify-between p-3.5 cursor-pointer active:bg-[#1C1E26]">
+                            <div class="flex flex-col pr-4">
+                                <span class="text-sm font-bold leading-tight">{{ ex.name }}</span>
+                                <span class="text-[10px] text-zinc-500 mt-1 capitalize">
+                                    {{ translateCategory(ex.category) }} • {{ ex.equipment }}
+                                </span>
+                            </div>
+                            <input type="checkbox" :value="ex.id" v-model="selectedExerciseIds" class="w-5 h-5 rounded border-[#22242D] bg-[#0F1115] text-blue-500 focus:ring-blue-500">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <button @click="saveCustomProgram"
+                    :disabled="(!isAddingDayOnly && !newProgramName) || !newTemplateName || selectedExerciseIds.length === 0"
+                    class="w-full mt-6 bg-blue-600 hover:bg-blue-700 disabled:opacity-30 disabled:pointer-events-none text-white font-extrabold py-3.5 rounded-xl transition-all active:scale-[0.99] shadow-lg shadow-blue-600/10 flex items-center justify-center">
+                <i class="ri-checkbox-circle-line mr-2 text-lg"></i> {{ isAddingDayOnly ? 'ДОБАВИТЬ ДЕНЬ' : 'СОЗДАТЬ И СОХРАНИТЬ' }}
+            </button>
+        </div>
+
+        <!-- ================= SUB-SCREEN: WORKOUT PREVIEW ================= -->
+        <div v-if="workoutSubScreen === 'preview'" class="py-2 flex flex-col justify-between min-h-[80vh]">
+            <div>
+                <div class="flex items-center space-x-2 mb-6">
+                    <button @click="workoutSubScreen === 'templates'" class="text-zinc-400 hover:text-white text-sm flex items-center">
+                        <i class="ri-arrow-left-line mr-1"></i> К шаблонам
+                    </button>
+                    <h2 class="text-lg font-bold tracking-tight text-white">Подготовка</h2>
+                </div>
+
+                <div class="bg-[#16171D] border border-[#22242D] rounded-2xl p-5 space-y-4 shadow-xl">
+                    <div>
+                        <span class="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-md uppercase font-bold tracking-wider">
+                            {{ activeProgram ? activeProgram.progressionType : 'Дефолт' }}
+                        </span>
+                        <h3 class="text-xl font-black mt-2 text-white capitalize">{{ activeTemplate.name }}</h3>
+                        <p class="text-xs text-zinc-500 mt-1 flex items-center">
+                            <i class="ri-time-line mr-1 text-zinc-400"></i> Ориентировочно: ~45 минут
+                        </p>
+                    </div>
+
+                    <div class="border-t border-[#22242D] pt-4">
+                        <h4 class="text-xs text-zinc-400 uppercase tracking-wider font-bold mb-3">План упражнений:</h4>
+                        <div class="space-y-3">
+                            <div v-for="(ex, index) in previewExercises" :key="ex.id" class="flex items-center space-x-3">
+                                <div class="text-xs font-bold text-blue-400 bg-blue-500/10 w-6 h-6 rounded-full flex items-center justify-center shrink-0">{{ index + 1 }}</div>
+                                <span class="text-sm text-zinc-200 capitalize font-medium">{{ ex.name }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button @click="startActiveWorkout"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl text-base tracking-wide transition-all active:scale-[0.99] shadow-lg shadow-blue-600/10 flex items-center justify-center">
+                <i class="ri-flashlight-line mr-2 text-lg"></i> НАЧАТЬ ТРЕНИРОВКУ
+            </button>
+        </div>
+
+        <!-- SUB-SCREEN: ACTIVE WORKOUT -->
+        <div v-if="workoutSubScreen === 'active_workout'" class="flex-grow flex flex-col justify-between">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-wider text-white uppercase flex items-center">
+                        <i class="ri-pulse-fill text-blue-500 mr-1.5"></i> Gym<span class="text-blue-500">Tracker</span>
+                    </h1>
+                    <p class="text-xs text-zinc-500 mt-0.5 flex items-center">
+                        <i class="ri-time-line mr-1 text-zinc-500"></i> Время: <span class="font-mono text-white text-sm font-bold ml-1">{{ formattedDuration }}</span>
+                    </p>
+                </div>
+                <button @click="finishWorkout" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-lg text-xs transition-all shadow-md active:scale-95 flex items-center">
+                    <i class="ri-checkbox-circle-fill mr-1"></i> ЗАКОНЧИТЬ
+                </button>
+            </div>
+
+            <div class="flex-grow space-y-4 mb-20 overflow-y-auto">
+                <div v-for="(exercise, exIndex) in activeExercises" :key="exercise.id" class="bg-[#16171D] p-5 rounded-2xl border border-[#22242D]">
+                    <div @click="openExerciseInfo(exercise)" class="flex items-center justify-between mb-4 cursor-pointer hover:bg-[#1C1E26] p-1.5 rounded-xl transition-colors">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-[#0F1115] border border-[#22242D] rounded-xl overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
+                                <img v-if="exercise.thumbnailURL" :src="exercise.thumbnailURL" class="w-full h-full object-cover opacity-80" alt="Превью">
+                                <span v-else class="text-xl text-zinc-500"><i class="ri-equalizer-line"></i></span>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-sm leading-tight text-white flex items-center capitalize">
+                                    {{ exercise.name }}
+                                    <span class="text-[10px] text-zinc-500 ml-2 font-normal flex items-center">
+                                        <i class="ri-information-line mr-0.5 text-zinc-500"></i> инфо
+                                    </span>
+                                </h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Сетка подходов (1-й скриншот) -->
+                    <div class="space-y-3">
+                        <div v-for="(set, setIndex) in exercise.sets" :key="setIndex"
+                             class="grid grid-cols-12 gap-2 items-center py-2.5 px-3 rounded-xl transition-colors"
+                             :class="set.completed ? 'bg-blue-950/10 border border-blue-500/20' : 'bg-[#1C1E26] border border-transparent'">
+
+                            <!-- Номер сета (серый круглый бейдж) -->
+                            <div class="col-span-2 text-center flex justify-center">
+                                <span class="w-7 h-7 rounded-full text-xs font-semibold flex items-center justify-center"
+                                      :class="set.completed ? 'bg-blue-500/20 text-blue-400' : 'bg-[#22242D] text-zinc-400'">
+                                    {{ setIndex + 1 }}
+                                </span>
+                            </div>
+
+                            <!-- Вес (кг) -->
+                            <div class="col-span-4 text-center">
+                                <input type="number" v-model.number="set.weight" :disabled="exercise.type === 'BODYWEIGHT'"
+                                       class="w-full bg-transparent text-center text-lg font-bold text-white focus:outline-none disabled:opacity-20">
+                                <span class="text-[9px] text-zinc-500 uppercase tracking-wider block mt-0.5">кг</span>
+                            </div>
+
+                            <!-- Повторения -->
+                            <div class="col-span-4 text-center">
+                                <input type="number" v-model.number="set.reps" class="w-full bg-transparent text-center text-lg font-bold text-white focus:outline-none">
+                                <span class="text-[9px] text-zinc-500 uppercase tracking-wider block mt-0.5">повторы</span>
+                            </div>
+
+                            <!-- Галочка -->
+                            <div class="col-span-2 flex justify-center">
+                                <button @click="toggleSet(exIndex, setIndex)"
+                                        class="w-7 h-7 rounded-full flex items-center justify-center transition-all border text-xs"
+                                        :class="set.completed ? 'bg-blue-500 border-blue-500 text-white font-black' : 'border-zinc-700 hover:border-zinc-500 text-transparent'">
+                                    ✓
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button @click="addSet(exIndex)"
+                            class="w-full mt-4 bg-[#1C1E26] hover:bg-[#22242D] text-zinc-300 py-2.5 rounded-xl text-xs font-semibold border border-dashed border-[#22242D] transition-all active:scale-[0.98] flex items-center justify-center">
+                        <i class="ri-add-line mr-1"></i> Добавить подход
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= TAB 2: WORKOUT HISTORY ================= -->
+    <div v-if="activeTab === 'history'" class="flex-grow flex flex-col justify-between py-2 overflow-y-auto max-h-[85vh]">
+        <div>
+            <div class="flex items-center space-x-2 mb-6">
+                <h2 class="text-xl font-bold tracking-tight text-white">История тренировок</h2>
+            </div>
+
+            <div v-if="loadingHistory" class="text-center text-zinc-500 py-10">Загрузка твоей истории...</div>
+
+            <div v-else-if="workoutHistory.length === 0" class="text-center text-zinc-500 py-10 text-sm">
+                У тебя пока нет выполненных тренировок. Время сделать первую!
+            </div>
+
+            <div v-else class="space-y-4 pr-1 mb-8">
+                <div v-for="w in workoutHistory" :key="w.id" class="bg-[#16171D] p-5 rounded-2xl border border-[#22242D] space-y-4 shadow-md">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-extrabold text-base text-white capitalize leading-tight">{{ w.name }}</h3>
+                            <p class="text-[10px] text-zinc-500 mt-2 flex items-center">
+                                <i class="ri-calendar-line text-zinc-500 mr-1.5"></i> {{ formatDate(w.date) }}
+                            </p>
+                        </div>
+                        <span class="text-xs bg-[#22242D] text-zinc-300 px-2.5 py-1 rounded-md font-bold shrink-0 flex items-center">
+                            <i class="ri-time-line text-zinc-400 mr-1"></i> {{ formatDurationMinutes(w.durationInSeconds) }}
+                        </span>
+                    </div>
+
+                    <div class="space-y-3 border-t border-[#22242D] pt-3">
+                        <div v-for="group in getGroupedExercises(w.workoutSets)" :key="group.name" class="text-xs">
+                            <div class="font-bold text-zinc-300 capitalize flex items-center">
+                                <i class="ri-checkbox-circle-line text-blue-500 mr-1.5"></i> {{ group.name }}
+                            </div>
+                            <div class="flex flex-wrap gap-1.5 text-zinc-500 mt-2">
+                                <span v-for="set in group.sets" :key="set.id" class="bg-[#1C1E26] text-[10px] px-2.5 py-1 rounded border border-[#22242D] font-medium text-zinc-400">
+                                    {{ set.setNumber }}—{{ group.type === 'BODYWEIGHT' ? '' : set.weight + 'кг x ' }}{{ set.reps }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= TAB 3: USER PROFILE ================= -->
+    <div v-if="activeTab === 'profile'" class="flex-grow flex flex-col justify-start py-4 overflow-y-auto max-h-[82vh] pr-1 space-y-6">
+
+        <div class="flex justify-between items-center">
+            <h2 class="text-xl font-bold tracking-tight text-white">Профиль атлета</h2>
+            <button @click="shareInviteLink" class="bg-blue-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg uppercase tracking-wider active:scale-95 shadow-md shadow-blue-500/20 flex items-center">
+                <i class="ri-share-forward-line mr-1"></i> Инвайт
+            </button>
+        </div>
+
+        <!-- КАРТОЧКА АВАТАРКИ И НИКА -->
+        <div class="bg-[#16171D] border border-[#22242D] rounded-2xl p-5 flex items-center space-x-4 shadow-sm">
+            <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-blue-500 flex items-center justify-center bg-blue-500/10 shrink-0">
+                <img v-if="tgUserPhoto" :src="tgUserPhoto" class="w-full h-full object-cover" alt="Avatar">
+                <span v-else class="text-2xl font-black text-blue-500 uppercase">{{ telegramUser.charAt(0) }}</span>
+            </div>
+            <div class="overflow-hidden">
+                <h3 class="text-lg font-black text-white leading-tight truncate">{{ telegramUser }}</h3>
+                <p class="text-xs text-zinc-500 mt-1 truncate">@{{ telegramUsername }}</p>
+                <p class="text-[10px] text-zinc-600 mt-0.5 truncate">ID: {{ telegramId }}</p>
+            </div>
+        </div>
+
+        <!-- КАРТОЧКА СТАТИСТИКИ -->
+        <div class="grid grid-cols-2 gap-3">
+            <div class="bg-[#16171D] border border-[#22242D] rounded-2xl p-4 text-center shadow-sm">
+                <span class="text-2xl font-black text-blue-500">{{ totalWorkoutsCount }}</span>
+                <p class="text-[10px] text-zinc-500 uppercase font-bold tracking-wider mt-1 flex items-center justify-center">
+                    <i class="ri-calendar-check-line mr-1 text-xs"></i> Тренировок
+                </p>
+            </div>
+            <div class="bg-[#16171D] border border-[#22242D] rounded-2xl p-4 text-center shadow-sm">
+                <span class="text-2xl font-black text-indigo-500">{{ totalTrainingTime }}</span>
+                <p class="text-[10px] text-zinc-500 uppercase font-bold tracking-wider mt-1 flex items-center justify-center">
+                    <i class="ri-time-line mr-1 text-xs"></i> Минут в зале
+                </p>
+            </div>
+        </div>
+
+        <!-- ВХОДЯЩИЕ ЗАПРОСЫ В ДРУЗЬЯ -->
+        <div v-if="pendingRequests.length > 0" class="bg-blue-950/10 border border-blue-500/20 rounded-2xl p-5 space-y-3">
+            <h4 class="text-xs uppercase tracking-wider text-blue-400 font-bold flex items-center">
+                <i class="ri-notification-badge-line mr-1 text-sm"></i> Входящие запросы ({{ pendingRequests.length }})
+            </h4>
+            <div class="space-y-3">
+                <div v-for="req in pendingRequests" :key="req.id" class="flex items-center justify-between bg-[#16171D] p-3 rounded-xl border border-[#22242D]">
+                    <div class="flex items-center space-x-3 overflow-hidden">
+                        <div class="w-8 h-8 rounded-full overflow-hidden border border-[#22242D] flex items-center justify-center bg-blue-500/10 text-blue-500 font-bold text-xs uppercase shrink-0">
+                            <span>{{ req.telegramUserName ? req.telegramUserName.charAt(0) : 'А' }}</span>
+                        </div>
+                        <div class="overflow-hidden">
+                            <div class="text-xs font-bold text-white truncate">{{ req.telegramUserName || 'Атлет' }}</div>
+                            <p class="text-[9px] text-zinc-600 truncate">ID: {{ req.telegramId }}</p>
+                        </div>
+                    </div>
+                    <button @click="acceptIncomingRequest(req)" class="bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-black px-3 py-1.5 rounded-lg shrink-0 uppercase tracking-wider active:scale-95 shadow-md shadow-blue-500/20">Принять</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- СЕТКА ДОСТИЖЕНИЙ -->
+        <div class="bg-[#16171D] border border-[#22242D] rounded-2xl p-5 space-y-4 shadow-sm">
+            <h4 class="text-xs uppercase tracking-wider text-zinc-500 font-bold flex items-center">
+                <i class="ri-award-line mr-1.5 text-sm"></i> Награды и Достижения
+            </h4>
+            <div v-if="loadingAchievements" class="text-center text-zinc-600 text-xs py-2">Проверка наград...</div>
+            <div v-else-if="allAchievements.length === 0" class="text-zinc-500 text-[10px] text-center">База наград пуста</div>
+            <div v-else class="grid grid-cols-3 gap-3">
+                <div v-for="ach in allAchievements" :key="ach.id" class="flex flex-col items-center text-center p-3 rounded-xl border transition-all relative" :class="isAchievementEarned(ach.id) ? 'bg-blue-500/5 border-blue-500/20 shadow-md shadow-blue-500/10' : 'bg-black/20 border-[#22242D] opacity-40 grayscale'">
+                    <div class="text-3xl mb-2 relative">
+                        {{ ach.icon }}
+                        <!-- Круглый замок на ачивках -->
+                        <span v-if="!isAchievementEarned(ach.id)" class="absolute -bottom-1 -right-1 bg-[#16171D] p-0.5 border border-[#22242D] rounded-full text-[9px] text-zinc-500 flex items-center justify-center">
+                            <i class="ri-lock-2-fill"></i>
+                        </span>
+                    </div>
+                    <span class="text-[10px] font-black text-white leading-tight mb-1">{{ ach.name }}</span>
+                    <span class="text-[8px] text-zinc-400 leading-tight">{{ ach.description }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- СПИСОК ДРУЗЕЙ -->
+        <div class="bg-[#16171D] border border-[#22242D] rounded-2xl p-5 space-y-3 mb-10 shadow-sm">
+            <div class="flex justify-between items-center mb-1">
+                <h4 class="text-xs uppercase tracking-wider text-zinc-500 font-bold flex items-center">
+                    <i class="ri-group-line mr-1.5 text-sm"></i> Мои Друзья ({{ friends.length }})
+                </h4>
+                <div class="flex space-x-1.5">
+                    <button @click="sendFriendRequest" class="text-[10px] text-blue-500 font-bold hover:underline flex items-center">
+                        <i class="ri-user-add-line mr-0.5"></i> Добавить
+                    </button>
+                </div>
+            </div>
+            <div v-if="loadingFriends" class="text-center text-zinc-600 text-xs py-2">Загрузка друзей...</div>
+            <div v-else-if="friends.length === 0" class="text-zinc-500 text-[10px] py-2 text-center leading-relaxed">У тебя пока нет друзей. Отправь инвайт-ссылку бро, чтобы следить за его прогрессом!</div>
+            <div v-else class="space-y-3 max-h-40 overflow-y-auto pr-1 mt-2">
+                <div v-for="friend in friends" :key="friend.id" class="flex items-center space-x-3 bg-[#1C1E26] p-2.5 rounded-xl border border-[#22242D]">
+                    <div class="w-8 h-8 rounded-full overflow-hidden border border-zinc-700 flex items-center justify-center bg-blue-500/10 text-blue-500 font-bold text-xs uppercase shrink-0">
+                        <span>{{ friend.telegramUserName ? friend.telegramUserName.charAt(0) : 'А' }}</span>
+                    </div>
+                    <div class="flex-grow overflow-hidden">
+                        <div class="text-xs font-bold text-white truncate">{{ friend.telegramUserName || 'Атлет' }}</div>
+                        <p class="text-[9px] text-zinc-600 truncate">ID: {{ friend.telegramId }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= BOTTOM NAVIGATION TAB BAR (Исправлено: Векторная гантель SVG) ================= -->
+    <div class="fixed bottom-0 left-0 right-0 bg-[#0F1115]/95 backdrop-blur-md border-t border-[#22242D] py-4 z-40 max-w-md mx-auto shadow-2xl">
+        <div class="flex justify-around items-center">
+            <button @click="switchTab('workouts')" class="flex flex-col items-center space-y-1 focus:outline-none w-1/3">
+                <span class="transition-all flex items-center justify-center h-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-6 h-6 transition-all" :class="activeTab === 'workouts' ? 'text-blue-500 stroke-[2.5]' : 'text-zinc-600'">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M18 8h2a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2M6 8H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2M8 5v14M16 5v14M8 12h8" />
+                    </svg>
+                </span>
+                <span class="text-[9px] uppercase tracking-wider font-bold transition-all mt-1" :class="activeTab === 'workouts' ? 'text-blue-500' : 'text-zinc-600'">Тренировка</span>
+            </button>
+            <button @click="switchTab('history')" class="flex flex-col items-center space-y-1 focus:outline-none w-1/3">
+                <span class="text-xl transition-all h-6 flex items-center justify-center" :class="activeTab === 'history' ? 'text-blue-500' : 'text-zinc-600'">
+                    <i :class="activeTab === 'history' ? 'ri-calendar-todo-fill' : 'ri-calendar-todo-line'"></i>
+                </span>
+                <span class="text-[9px] uppercase tracking-wider font-bold transition-all mt-1" :class="activeTab === 'history' ? 'text-blue-500' : 'text-zinc-600'">Отчёт</span>
+            </button>
+            <button @click="switchTab('profile')" class="flex flex-col items-center space-y-1 focus:outline-none w-1/3">
+                <span class="text-xl transition-all h-6 flex items-center justify-center" :class="activeTab === 'profile' ? 'text-blue-500' : 'text-zinc-600'">
+                    <i :class="activeTab === 'profile' ? 'ri-user-3-fill' : 'ri-user-3-line'"></i>
+                </span>
+                <span class="text-[9px] uppercase tracking-wider font-bold transition-all mt-1" :class="activeTab === 'profile' ? 'text-blue-500' : 'text-zinc-600'">Я</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- BOTTOM SHEET ИНФО ОПИСАНИЯ (Исправлено: оптимизированный аккуратный размер гифок) -->
+    <transition name="slide-up">
+        <div v-if="isInfoOpen" class="fixed inset-0 bg-black/60 z-50 flex items-end justify-center" @click.self="isInfoOpen = false">
+            <div class="bg-[#16171D] border-t border-[#22242D] rounded-t-3xl w-full max-w-md p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[85vh]">
+                <div class="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-1"></div>
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="text-lg font-black text-white leading-tight capitalize">{{ selectedExercise.name }}</h3>
+                        <span class="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-md uppercase font-bold mt-2 inline-block">
+                            {{ selectedExercise.type === 'WEIGHTED' ? 'С весом' : 'Собственный вес' }}
+                        </span>
+                    </div>
+                    <button @click="isInfoOpen = false" class="text-zinc-500 hover:text-white font-bold text-sm bg-[#22242D] w-7 h-7 rounded-full flex items-center justify-center shrink-0">
+                        <i class="ri-close-line"></i>
+                    </button>
+                </div>
+
+                <!-- Оптимизированный контейнер для демонстрации упражнения (без растягивания и шакального качества) -->
+                <div v-if="selectedExercise.imageURL" class="w-full flex justify-center py-2">
+                    <div class="w-56 h-56 rounded-2xl overflow-hidden border border-[#22242D] bg-white p-3 flex items-center justify-center shadow-inner">
+                        <img :src="selectedExercise.imageURL" class="max-w-full max-h-full object-contain" alt="Техника выполнения">
+                    </div>
+                </div>
+                <div v-else class="w-full h-40 rounded-2xl border border-dashed border-[#22242D] flex items-center justify-center text-zinc-500 text-xs">Нет демонстрации для этого упражнения</div>
+
+                <div class="space-y-2">
+                    <h4 class="text-xs uppercase tracking-wider text-zinc-500 font-bold">Техника выполнения:</h4>
+                    <p class="text-sm text-zinc-300 leading-relaxed">{{ selectedExercise.description }}</p>
+                </div>
+            </div>
+        </div>
+    </transition>
+
+</div>
+
+<script>
+    const { createApp, ref, computed, onMounted } = Vue;
+
+    createApp({
+        setup() {
+            const activeTab = ref('workouts');
+            const workoutSubScreen = ref('menu');
+
+            const allExercises = ref([]);
+            const activeExercises = ref([]);
+            const customPrograms = ref([]);
+            const loadingPrograms = ref(false);
+            const workoutName = ref("");
+
+            const telegramUser = ref("Атлет");
+            const telegramUsername = ref("gym_athlete");
+            const telegramId = ref(7625258453);
+            const tgUserPhoto = ref(null);
+            const tg = window.Telegram?.WebApp;
+
+            const workoutDuration = ref(0);
+            let timerInterval = null;
+
+            const workoutHistory = ref([]);
+            const loadingHistory = ref(false);
+
+            const friends = ref([]);
+            const pendingRequests = ref([]);
+            const loadingFriends = ref(false);
+
+            const allAchievements = ref([]);
+            const earnedAchievements = ref([]);
+            const loadingAchievements = ref(false);
+
+            const newProgramName = ref("");
+            const newProgramType = ref("LINEAR");
+            const newTemplateName = ref("");
+            const selectedExerciseIds = ref([]);
+
+            const isAddingDayOnly = ref(false);
+            const selectedProgramId = ref(null);
+
+            const activeProgram = ref(null);
+            const activeTemplate = ref(null);
+            const previewExercises = ref([]);
+
+            const isInfoOpen = ref(false);
+            const selectedExercise = ref(null);
+
+            const searchQuery = ref("");
+            const filterCategory = ref("");
+            const filterEquipment = ref("");
+
+            const predefinedTemplates = ref([
+                {
+                    id: 999,
+                    name: "FullBody Классика (Дефолт)",
+                    description: "Комплексная тренировка на всё тело. Идеально для старта.",
+                    exerciseNames: ["жим штанги лежа", "присед со штангой", "подтягивания"]
+                }
+            ]);
+
+            onMounted(() => {
+                if (tg) {
+                    tg.ready();
+                    tg.expand();
+                    if (tg.initDataUnsafe?.user) {
+                        telegramId.value = tg.initDataUnsafe.user.id;
+                        telegramUser.value = tg.initDataUnsafe.user.first_name || "Атлет";
+                        telegramUsername.value = tg.initDataUnsafe.user.username || "gym_athlete";
+                        tgUserPhoto.value = tg.initDataUnsafe.user.photo_url || null;
+                    }
+                }
+                fetchAllExercises();
+                fetchAchievementsCatalog();
+            });
+
+            // Метод генерации инициалов (для круглых иконок)
+            const getInitials = (name) => {
+                if (!name) return "?";
+                const clean = name.replace(/[^a-zA-Zа-яА-Я0-9\s]/g, '').trim();
+                const parts = clean.split(/\s+/);
+                if (parts.length >= 2) {
+                    return (parts[0][0] + parts[1][0]).toUpperCase();
+                }
+                return name.substring(0, 2).toUpperCase();
+            };
+
+            // Метод ротации фонов для круглых иконок
+            const getBadgeBg = (index) => {
+                const colors = [
+                    'bg-[#2563EB]', // Синий
+                    'bg-[#4F46E5]', // Индиго
+                    'bg-[#DC2626]', // Красный
+                    'bg-[#7C3AED]', // Фиолетовый
+                    'bg-[#059669]', // Изумрудный
+                    'bg-[#2563EB]'
+                ];
+                return colors[index % colors.length];
+            };
+
+            const totalWorkoutsCount = computed(() => workoutHistory.value.length);
+            const totalTrainingTime = computed(() => {
+                const totalSeconds = workoutHistory.value.reduce((acc, w) => acc + (w.durationInSeconds || 0), 0);
+                return Math.floor(totalSeconds / 60);
+            });
+
+            const uniqueCategories = computed(() => {
+                const cats = allExercises.value.map(ex => ex.category).filter(Boolean);
+                return [...new Set(cats)];
+            });
+
+            const uniqueEquipments = computed(() => {
+                const eqs = allExercises.value.map(ex => ex.equipment).filter(Boolean);
+                return [...new Set(eqs)];
+            });
+
+            const translateCategory = (cat) => {
+                if (!cat) return "";
+                const dict = {
+                    "back": "Спина",
+                    "cardio": "Кардио",
+                    "chest": "Грудь",
+                    "lower arms": "Предплечья",
+                    "lower legs": "Икры / Голень",
+                    "neck": "Шея",
+                    "shoulders": "Плечи / Дельты",
+                    "upper arms": "Руки (Бицепс/Трицепс)",
+                    "upper legs": "Ноги (Квадрицепс/Ягодицы)",
+                    "waist": "Пресс / Талия"
+                };
+                return dict[cat.toLowerCase()] || cat;
+            };
+
+            const filteredExercises = computed(() => {
+                let list = allExercises.value;
+                if (searchQuery.value) {
+                    const query = searchQuery.value.toLowerCase();
+                    list = list.filter(ex => ex.name.toLowerCase().includes(query));
+                }
+                if (filterCategory.value) {
+                    list = list.filter(ex => ex.category === filterCategory.value);
+                }
+                if (filterEquipment.value) {
+                    list = list.filter(ex => ex.equipment === filterEquipment.value);
+                }
+                return list.slice(0, 30);
+            });
+
+            const formattedDuration = computed(() => {
+                const minutes = Math.floor(workoutDuration.value / 60);
+                const seconds = workoutDuration.value % 60;
+                return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            });
+
+            const fetchAllExercises = async () => {
+                try {
+                    const response = await axios.get('/api/workouts/exercises');
+                    allExercises.value = response.data;
+                } catch (error) {
+                    console.error("Ошибка при получении упражнений:", error);
+                }
+            };
+
+            const fetchAchievementsCatalog = async () => {
+                try {
+                    const response = await axios.get('/api/workouts/achievements/catalog');
+                    allAchievements.value = response.data;
+                } catch (error) {
+                    console.error("Ошибка каталога ачивок:", error);
+                    allAchievements.value = [
+                        { id: 1, name: "Первые шаги", description: "Выполнил 5 тренировок", icon: "🥇" },
+                        { id: 2, name: "Режим активирован", description: "Выполнил 10 тренировок", icon: "💪" },
+                        { id: 3, name: "Постоянный клиент", description: "Провел суммарно 2 часа в зале", icon: "⏱" }
+                    ];
+                }
+            };
+
+            const openTemplatesScreen = async () => {
+                workoutSubScreen.value = 'templates';
+                loadCustomPrograms();
+            };
+
+            const switchTab = (tab) => {
+                activeTab.value = tab;
+                if (tab === 'workouts') {
+                    workoutSubScreen.value = 'menu';
+                } else if (tab === 'history') {
+                    loadHistoryData();
+                } else if (tab === 'profile') {
+                    loadHistoryData();
+                    loadFriendsData();
+                    loadEarnedAchievements();
+                    loadPendingRequests();
+                }
+            };
+
+            const loadPendingRequests = async () => {
+                try {
+                    const response = await axios.get('/api/workouts/friends/pending', {
+                        params: { telegramId: telegramId.value }
+                    });
+                    pendingRequests.value = response.data;
+                } catch (error) {
+                    console.error("Ошибка загрузки входящих запросов:", error);
+                }
+            };
+
+            const loadEarnedAchievements = async () => {
+                loadingAchievements.value = true;
+                try {
+                    const response = await axios.get('/api/workouts/achievements', {
+                        params: { telegramId: telegramId.value }
+                    });
+                    earnedAchievements.value = response.data.map(ua => ua.achievement.id);
+                } catch (error) {
+                    console.error("Ошибка загрузки заработанных ачивок:", error);
+                } finally {
+                    loadingAchievements.value = false;
+                }
+            };
+
+            const isAchievementEarned = (achievementId) => {
+                return earnedAchievements.value.includes(achievementId);
+            };
+
+            const loadFriendsData = async () => {
+                loadingFriends.value = true;
+                try {
+                    const response = await axios.get('/api/workouts/friends', {
+                        params: { telegramId: telegramId.value }
+                    });
+                    friends.value = response.data;
+                } catch (error) {
+                    console.error("Ошибка загрузки друзей:", error);
+                } finally {
+                    loadingFriends.value = false;
+                }
+            };
+
+            const sendFriendRequest = async () => {
+                const recipientId = prompt("Введи Telegram ID твоего друга для отправки запроса:");
+                if (!recipientId) return;
+                try {
+                    await axios.post('/api/workouts/friends/request', null, {
+                        params: {
+                            requesterId: telegramId.value,
+                            recipientId: recipientId
+                        }
+                    });
+                    alert("Запрос на дружбу успешно отправлен!");
+                } catch (error) {
+                    console.error(error);
+                    alert("Ошибка отправки запроса! Проверь ID.");
+                }
+            };
+
+            const acceptFriendRequest = async () => {
+                const requesterId = prompt("Введи Telegram ID пользователя, чей запрос ты хочешь принять:");
+                if (!requesterId) return;
+                try {
+                    await axios.post('/api/workouts/friends/accept', null, {
+                        params: {
+                            requesterId: requesterId,
+                            recipientId: telegramId.value
+                        }
+                    });
+                    alert("Запрос принят! Вы теперь друзья.");
+                    loadFriendsData();
+                } catch (error) {
+                    console.error(error);
+                    alert("Запрос не найден или уже одобрен.");
+                }
+            };
+
+            const acceptIncomingRequest = async (reqUser) => {
+                try {
+                    await axios.post('/api/workouts/friends/accept', null, {
+                        params: {
+                            requesterId: reqUser.telegramId,
+                            recipientId: telegramId.value
+                        }
+                    });
+                    alert(`Вы теперь друзья с ${reqUser.telegramUserName || 'Атлетом'}!`);
+                    loadPendingRequests();
+                    loadFriendsData();
+                } catch (error) {
+                    console.error(error);
+                    alert("Ошибка принятия запроса!");
+                }
+            };
+
+            const shareInviteLink = () => {
+                if (tg) {
+                    const inviteUrl = `https://t.me/share/url?url=https://t.me/Gym_Tracker_app_bot?start=ref_${telegramId.value}&text=Бро, залетай в GymTracker Pro! Это дневник тренировок, который сам считает веса и ведет статистику. Давай тренить вместе!`;
+                    tg.openTelegramLink(inviteUrl);
+                } else {
+                    prompt("Скопируй эту инвайт-ссылку и отправь другу:", `https://t.me/Gym_Tracker_app_bot?start=ref_${telegramId.value}`);
+                }
+            };
+
+            const loadHistoryData = async () => {
+                loadingHistory.value = true;
+                try {
+                    const response = await axios.get('/api/workouts/history', {
+                        params: { telegramId: telegramId.value }
+                    });
+                    workoutHistory.value = response.data;
+                } catch (error) {
+                    console.error("Ошибка истории:", error);
+                } finally {
+                    loadingHistory.value = false;
+                }
+            };
+
+            const openWorkoutPreview = (program, template) => {
+                activeProgram.value = program;
+                activeTemplate.value = template;
+
+                if (program) {
+                    previewExercises.value = template.templates ? template.templates.map(t => t.exercise) : [];
+                } else {
+                    previewExercises.value = allExercises.value.filter(ex =>
+                        template.exerciseNames.map(n => n.toLowerCase()).includes(ex.name.toLowerCase())
+                    );
+                }
+
+                workoutSubScreen.value = 'preview';
+            };
+
+            const startActiveWorkout = () => {
+                workoutName.value = activeTemplate.value.name;
+                initWorkout(previewExercises.value, activeTemplate.value.name, activeProgram.value ? activeProgram.value.id : null);
+            };
+
+            const loadCustomPrograms = async () => {
+                loadingPrograms.value = true;
+                try {
+                    const response = await axios.get('/api/workouts/programs', {
+                        params: { telegramId: telegramId.value }
+                    });
+                    customPrograms.value = response.data;
+                } catch (error) {
+                    console.error("Ошибка загрузки программ:", error);
+                } finally {
+                    loadingPrograms.value = false;
+                }
+            };
+
+            const deleteProgram = async (programId, programName) => {
+                if (!confirm(`Ты уверен, что хочешь безвозвратно удалить программу "${programName}"?`)) {
+                    return;
+                }
+                try {
+                    await axios.delete(`/api/workouts/programs/${programId}`);
+                    alert("Программа успешно удалена!");
+                    loadCustomPrograms();
+                } catch (error) {
+                    console.error("Ошибка удаления:", error);
+                    alert("Не удалось удалить программу!");
+                }
+            };
+
+            const openConstructor = () => {
+                isAddingDayOnly.value = false;
+                selectedProgramId.value = null;
+                newProgramName.value = "";
+                newTemplateName.value = "";
+                selectedExerciseIds.value = [];
+                searchQuery.value = "";
+                filterCategory.value = "";
+                filterEquipment.value = "";
+                workoutSubScreen.value = 'constructor';
+            };
+
+            const openAddDayOnly = (program) => {
+                isAddingDayOnly.value = true;
+                selectedProgramId.value = program.id;
+                newTemplateName.value = "";
+                selectedExerciseIds.value = [];
+                searchQuery.value = "";
+                filterCategory.value = "";
+                filterEquipment.value = "";
+                workoutSubScreen.value = 'constructor';
+            };
+
+            const saveCustomProgram = async () => {
+                try {
+                    let programId = selectedProgramId.value;
+
+                    if (!isAddingDayOnly.value) {
+                        const programResponse = await axios.post('/api/workouts/programs', {
+                            telegramId: telegramId.value,
+                            name: newProgramName.value,
+                            progressionType: newProgramType.value
+                        });
+                        programId = programResponse.data;
+                    }
+
+                    await axios.post(`/api/workouts/programs/${programId}/templates`, {
+                        name: newTemplateName.value,
+                        exerciseIds: selectedExerciseIds.value
+                    });
+
+                    alert(isAddingDayOnly.value ? "Новый день успешно добавлен!" : "Программа тренировок успешно создана!");
+                    loadCustomPrograms();
+                    workoutSubScreen.value = 'templates';
+                } catch (error) {
+                    console.error("Ошибка создания:", error);
+                    alert("Произошла ошибка при сохранении!");
+                }
+            };
+
+            const startCustomWorkout = async (program, template) => {
+                workoutName.value = template.name;
+                const exercisesInTemplate = template.templates ? template.templates.map(t => t.exercise) : [];
+                initWorkout(exercisesInTemplate, template.name, program.id);
+            };
+
+            const startTemplateWorkout = (template) => {
+                workoutName.value = template.name;
+                const filtered = allExercises.value.filter(ex =>
+                    template.exerciseNames.map(n => n.toLowerCase()).includes(ex.name.toLowerCase())
+                );
+                initWorkout(filtered, template.name, null);
+            };
+
+            const initWorkout = async (exerciseList, templateName, programId) => {
+                activeExercises.value = [];
+                workoutSubScreen.value = 'active_workout';
+
+                let latestSetsMap = {};
+                try {
+                    const response = await axios.get('/api/workouts/latest', {
+                        params: {
+                            telegramId: telegramId.value,
+                            name: templateName
+                        }
+                    });
+
+                    response.data.forEach(set => {
+                        if (!latestSetsMap[set.exerciseId]) {
+                            latestSetsMap[set.exerciseId] = [];
+                        }
+                        latestSetsMap[set.exerciseId].push(set);
+                    });
+                } catch (error) {
+                    console.error("Не удалось получить историю весов:", error);
+                }
+
+                activeExercises.value = exerciseList.map(ex => {
+                    const prevSets = latestSetsMap[ex.id];
+                    let sets = [];
+
+                    if (prevSets && prevSets.length > 0) {
+                        sets = prevSets.map(p => ({
+                            weight: p.weight,
+                            reps: p.reps,
+                            completed: false
+                        }));
+                    } else {
+                        sets = [
+                            { weight: ex.type === 'BODYWEIGHT' ? 0 : 60, reps: 10, completed: false },
+                            { weight: ex.type === 'BODYWEIGHT' ? 0 : 60, reps: 10, completed: false },
+                            { weight: ex.type === 'BODYWEIGHT' ? 0 : 60, reps: 10, completed: false }
+                        ];
+                    }
+
+                    return {
+                        ...ex,
+                        sets: sets
+                    };
+                });
+
+                workoutDuration.value = 0;
+                if (timerInterval) clearInterval(timerInterval);
+                timerInterval = setInterval(() => {
+                    workoutDuration.value++;
+                }, 1000);
+            };
+
+            const openExerciseInfo = (exercise) => {
+                selectedExercise.value = exercise;
+                isInfoOpen.value = true;
+            };
+
+            const addSet = (exIndex) => {
+                const sets = activeExercises.value[exIndex].sets;
+                const lastSet = sets[sets.length - 1];
+                sets.push({
+                    weight: lastSet ? lastSet.weight : 60,
+                    reps: lastSet ? lastSet.reps : 10,
+                    completed: false
+                });
+            };
+
+            const toggleSet = (exIndex, setIndex) => {
+                activeExercises.value[exIndex].sets[setIndex].completed = !activeExercises.value[exIndex].sets[setIndex].completed;
+            };
+
+            const finishWorkout = async () => {
+                const payload = {
+                    telegramId: telegramId.value,
+                    workoutName: workoutName.value,
+                    durationInSeconds: workoutDuration.value,
+                    programId: selectedProgramId.value,
+                    sets: []
+                };
+
+                activeExercises.value.forEach(ex => {
+                    ex.sets.forEach((set, index) => {
+                        if (set.completed) {
+                            payload.sets.push({
+                                exerciseId: ex.id,
+                                setNumber: index + 1,
+                                weight: set.weight,
+                                reps: set.reps
+                            });
+                        }
+                    });
+                });
+
+                if (payload.sets.length === 0) {
+                    alert("Отметь галочкой хотя бы один выполненный подход!");
+                    return;
+                }
+
+                try {
+                    await axios.post('/api/workouts', payload);
+                    alert(`Тренировка записана! Время: ${formattedDuration.value}`);
+                    if (timerInterval) clearInterval(timerInterval);
+                    switchTab('workouts');
+                } catch (error) {
+                    console.error("Ошибка сохранения:", error);
+                    alert("Ошибка!");
+                }
+            };
+
+            // ФОРМАТИРОВАНИЕ ДАТЫ
+            const formatDate = (dateStr) => {
+                if (!dateStr) return "";
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('ru-RU', {
+                    day: 'numeric',
+                    month: 'long',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            };
+
+            // ФОРМАТИРОВАНИЕ МИНУТ
+            const formatDurationMinutes = (seconds) => {
+                if (!seconds) return "0 мин";
+                const m = Math.floor(seconds / 60);
+                return `${m} мин`;
+            };
+
+            // ГРУППИРОВКА УПРАЖНЕНИЙ
+            const getGroupedExercises = (sets) => {
+                if (!sets) return [];
+                const groups = {};
+                sets.forEach(s => {
+                    const exId = s.exercise.id;
+                    if (!groups[exId]) {
+                        groups[exId] = {
+                            name: s.exercise.name,
+                            type: s.exercise.type,
+                            sets: []
+                        };
+                    }
+                    groups[exId].sets.push(s);
+                });
+                return Object.values(groups);
+            };
+
+            return {
+                activeTab,
+                workoutSubScreen,
+                predefinedTemplates,
+                customPrograms,
+                loadingPrograms,
+                activeExercises,
+                allExercises,
+                filteredExercises,
+                workoutName,
+                telegramUser,
+                telegramUsername,
+                telegramId,
+                tgUserPhoto,
+                newProgramName,
+                newProgramType,
+                newTemplateName,
+                selectedExerciseIds,
+                formattedDuration,
+                isAddingDayOnly,
+                isInfoOpen,
+                selectedExercise,
+                searchQuery,
+                filterCategory,
+                filterEquipment,
+                uniqueCategories,
+                uniqueEquipments,
+                workoutHistory,
+                loadingHistory,
+                friends,
+                loadingFriends,
+                allAchievements,
+                earnedAchievements,
+                loadingAchievements,
+                pendingRequests,
+                translateCategory,
+                openTemplatesScreen,
+                openConstructor,
+                saveCustomProgram,
+                startCustomWorkout,
+                startTemplateWorkout,
+                addSet,
+                toggleSet,
+                finishWorkout,
+                deleteProgram,
+                openAddDayOnly,
+                openExerciseInfo,
+                switchTab,
+                openWorkoutPreview,
+                startActiveWorkout,
+                formatDate,
+                formatDurationMinutes,
+                getGroupedExercises,
+
+                // Добавленные методы визуализации и недостающие биндинги
+                getInitials,
+                getBadgeBg,
+                totalWorkoutsCount,
+                totalTrainingTime,
+                sendFriendRequest,
+                shareInviteLink,
+                isAchievementEarned,
+                acceptIncomingRequest,
+                acceptFriendRequest,
+                activeProgram,
+                activeTemplate
+            };
+        }
+    }).mount('#app');
+</script>
+
+<style>
+    .slide-up-enter-active, .slide-up-leave-active {
+        transition: opacity 0.25s ease;
+    }
+    .slide-up-enter-active .rounded-t-3xl, .slide-up-leave-active .rounded-t-3xl {
+        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .slide-up-enter-from {
+        opacity: 0;
+    }
+    .slide-up-enter-from .rounded-t-3xl {
+        transform: translateY(100%);
+    }
+    .slide-up-leave-to {
+        opacity: 0;
+    }
+    .slide-up-leave-to .rounded-t-3xl {
+        transform: translateY(100%);
+    }
+    ::-webkit-scrollbar {
+        width: 4px;
+    }
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #22242D;
+        border-radius: 10px;
+    }
+</style>
+
+</body>
+</html>
