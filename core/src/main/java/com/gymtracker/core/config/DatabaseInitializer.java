@@ -2,16 +2,11 @@ package com.gymtracker.core.config;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gymtracker.core.Repository.AchievementRepository;
-import com.gymtracker.core.Repository.ExerciseRepository;
-import com.gymtracker.core.Repository.WorkoutTemplateRepository;
-import com.gymtracker.core.Repository.TemplateExerciseRepository;
-import com.gymtracker.core.entity.Achievement;
-import com.gymtracker.core.entity.Exercise;
-import com.gymtracker.core.entity.WorkoutTemplate;
-import com.gymtracker.core.entity.TemplateExercise;
+import com.gymtracker.core.Repository.*;
+import com.gymtracker.core.entity.*;
 import com.gymtracker.core.entity.enums.AchievementTrigger;
 import com.gymtracker.core.entity.enums.ExerciseType;
+import com.gymtracker.core.entity.enums.ProgressionType;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -23,16 +18,19 @@ public class DatabaseInitializer implements CommandLineRunner {
 
     private final ExerciseRepository exerciseRepository;
     private final AchievementRepository achievementRepository;
+    private final TrainingProgramRepository trainingProgramRepository;
     private final WorkoutTemplateRepository workoutTemplateRepository;
     private final TemplateExerciseRepository templateExerciseRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DatabaseInitializer(ExerciseRepository exerciseRepository,
                                AchievementRepository achievementRepository,
+                               TrainingProgramRepository trainingProgramRepository,
                                WorkoutTemplateRepository workoutTemplateRepository,
                                TemplateExerciseRepository templateExerciseRepository) {
         this.exerciseRepository = exerciseRepository;
         this.achievementRepository = achievementRepository;
+        this.trainingProgramRepository = trainingProgramRepository;
         this.workoutTemplateRepository = workoutTemplateRepository;
         this.templateExerciseRepository = templateExerciseRepository;
     }
@@ -68,23 +66,42 @@ public class DatabaseInitializer implements CommandLineRunner {
             System.out.println("=== ИМПОРТ ЗАВЕРШЕН! УСПЕШНО ЗАГРУЖЕНО " + exercises.size() + " УПРАЖНЕНИЙ ===");
         }
 
-        // 2. НАПОЛНЯЕМ СТАНДАРТНЫЕ ТРЕНИРОВКИ (Исправлено условие: проверяем только стандартные тренировки, а не кастомные)
-        if (workoutTemplateRepository.findByTrainingProgramIsNull().isEmpty()) {
-            System.out.println("=== НАЧАЛО ИМПОРТА СТАНДАРТНЫХ ШАБЛОНОВ ===");
+        // 2. ИМПОРТ ПРЕДУСТАНОВЛЕННЫХ ПРОГРАММ (Вариант Б)
+        if (trainingProgramRepository.findByUserIsNull().isEmpty()) {
+            System.out.println("=== НАЧАЛО ИМПОРТА ПРЕДУСТАНОВЛЕННЫХ ПРОГРАММ ===");
 
-            createPredefinedTemplate("FullBody Классика (Дефолт)",
-                    new String[]{"жим штанги лежа", "приседания со штангой", "подтягивания"});
+            // Программа 1: Силовой сплит (Верх / Низ)
+            TrainingProgram p1 = new TrainingProgram();
+            p1.setName("Сплит Верх / Низ (Рекомендуемый)");
+            p1.setUser(null); // NULL - означает дефолтную программу
+            p1.setProgressionType(ProgressionType.LINEAR);
+            p1.setCurrentWeek(1);
+            trainingProgramRepository.save(p1);
 
-            createPredefinedTemplate("Верх тела (Сила и Объем)",
-                    new String[]{"жим штанги лежа", "тяга штанги в наклоне", "армейский жим"});
+            createPredefinedTemplate(p1, "День А - Верх тела", new String[]{"жим штанги лежа", "тяга штанги в наклоне", "армейский жим"});
+            createPredefinedTemplate(p1, "День Б - Низ тела", new String[]{"приседания со штангой", "становая тяга", "выпады"});
 
-            createPredefinedTemplate("Низ тела (Мощный старт)",
-                    new String[]{"приседания со штангой", "становая тяга", "выпады"});
+            // Программа 2: FullBody Программа
+            TrainingProgram p2 = new TrainingProgram();
+            p2.setName("FullBody Классика (Рекомендуемая)");
+            p2.setUser(null);
+            p2.setProgressionType(ProgressionType.LINEAR);
+            p2.setCurrentWeek(1);
+            trainingProgramRepository.save(p2);
 
-            createPredefinedTemplate("Пресс и Кор (Стальной пресс)",
-                    new String[]{"скручивания", "планка"});
+            createPredefinedTemplate(p2, "Комплексный день", new String[]{"жим штанги лежа", "приседания со штангой", "подтягивания"});
 
-            System.out.println("=== ИМПОРТ СТАНДАРТНЫХ ШАБЛОНОВ ЗАВЕРШЕН ===");
+            // Программа 3: Пресс и Кор
+            TrainingProgram p3 = new TrainingProgram();
+            p3.setName("Пресс и Кор (Рекомендуемая)");
+            p3.setUser(null);
+            p3.setProgressionType(ProgressionType.MANUAL);
+            p3.setCurrentWeek(1);
+            trainingProgramRepository.save(p3);
+
+            createPredefinedTemplate(p3, "Пресс-интенсив", new String[]{"скручивания", "планка"});
+
+            System.out.println("=== ИМПОРТ ПРЕДУСТАНОВЛЕННЫХ ПРОГРАММ ЗАВЕРШЕН ===");
         }
 
         // 3. НАПОЛНЯЕМ ДОСТИЖЕНИЯ
@@ -116,11 +133,11 @@ public class DatabaseInitializer implements CommandLineRunner {
         }
     }
 
-    // Вспомогательный метод для создания стандартных шаблонов
-    private void createPredefinedTemplate(String templateName, String[] exerciseQueries) {
+    // Вспомогательный метод для создания дней внутри стандартной программы
+    private void createPredefinedTemplate(TrainingProgram program, String templateName, String[] exerciseQueries) {
         WorkoutTemplate template = new WorkoutTemplate();
         template.setName(templateName);
-        template.setTrainingProgram(null); // NULL означает глобальную стандартную тренировку
+        template.setTrainingProgram(program);
 
         WorkoutTemplate savedTemplate = workoutTemplateRepository.save(template);
 

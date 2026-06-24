@@ -9,4 +9,6 @@ import java.util.List;
 @Repository
 public interface WorkoutTemplateRepository extends JpaRepository<WorkoutTemplate, Long> {
     List<WorkoutTemplate> findByTrainingProgramIsNull();
+
+
 }

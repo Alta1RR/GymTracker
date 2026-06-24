@@ -10,4 +10,6 @@ import java.util.List;
 @Repository
 public interface TrainingProgramRepository extends JpaRepository<TrainingProgram, Long> {
     List<TrainingProgram> findByUser(AppUser user);
+
+    List<TrainingProgram> findByUserIsNull();
 }

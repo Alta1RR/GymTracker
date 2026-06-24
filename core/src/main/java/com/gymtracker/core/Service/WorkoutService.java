@@ -349,5 +349,8 @@ public class WorkoutService {
     public List<WorkoutTemplate> getPredefinedTemplates() {
         return workoutTemplateRepository.findByTrainingProgramIsNull();
     }
-
+    // ПОЛУЧЕНИЕ ПРЕДУСТАНОВЛЕННЫХ ПРОГРАММ С БЭКЕНДА
+    public List<TrainingProgram> getPredefinedPrograms() {
+        return trainingProgramRepository.findByUserIsNull();
+    }
 }

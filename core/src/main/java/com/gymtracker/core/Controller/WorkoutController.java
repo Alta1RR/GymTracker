@@ -16,6 +16,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/workouts")
 public class WorkoutController {
+
     private final WorkoutService workoutService;
     private final ExerciseRepository exerciseRepository;
     private final AchievementRepository achievementRepository;
@@ -40,7 +41,6 @@ public class WorkoutController {
     @PostMapping("/programs")
     public ResponseEntity<Long> createProgram(@RequestBody ProgramCreateRequest request) {
         Long programId = workoutService.createTrainingProgram(request);
-
         return ResponseEntity.ok(programId);
     }
 
@@ -48,7 +48,6 @@ public class WorkoutController {
     public ResponseEntity<String> addTemplateToProgram(
             @PathVariable("programId") Long programId,
             @RequestBody TemplateCreateRequest request) {
-
         workoutService.addTemplateToProgram(programId, request);
         return ResponseEntity.ok("Template added to program successfully!");
     }
@@ -61,7 +60,7 @@ public class WorkoutController {
     @DeleteMapping("/programs/{id}")
     public ResponseEntity<String> deleteProgram(@PathVariable("id") Long id){
         workoutService.deleteProgram(id);
-        return  ResponseEntity.ok("Program deleted successfully!");
+        return ResponseEntity.ok("Program deleted successfully!");
     }
 
     @GetMapping("/latest")
@@ -113,5 +112,9 @@ public class WorkoutController {
         return ResponseEntity.ok(workoutService.getPendingRequests(telegramId));
     }
 
-
+    // ПОЛУЧЕНИЕ ГОТОВЫХ СТАНДАРТНЫХ ПРОГРАММ (Вариант Б)
+    @GetMapping("/predefined")
+    public ResponseEntity<List<TrainingProgram>> getPredefinedTemplates() {
+        return ResponseEntity.ok(workoutService.getPredefinedPrograms());
+    }
 }
