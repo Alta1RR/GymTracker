@@ -345,4 +345,9 @@ public class WorkoutService {
         }
         return requesters;
     }
+
+    public List<WorkoutTemplate> getPredefinedTemplates() {
+        return workoutTemplateRepository.findByTrainingProgramIsNull();
+    }
+
 }
