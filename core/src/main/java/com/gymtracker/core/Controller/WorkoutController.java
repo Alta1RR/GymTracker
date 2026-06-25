@@ -8,10 +8,14 @@ import com.gymtracker.core.dto.TemplateCreateRequest;
 import com.gymtracker.core.dto.WorkoutSaveRequest;
 import com.gymtracker.core.dto.WorkoutSetDto;
 import com.gymtracker.core.entity.*;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.gymtracker.core.dto.FriendProfileResponse;
 
 import java.util.List;
+
+import static com.gymtracker.core.config.TelegramAuthFilter.TELEGRAM_USER_ID_ATTRIBUTE;
 
 @RestController
 @RequestMapping("/api/workouts")
@@ -28,7 +32,9 @@ public class WorkoutController {
     }
 
     @PostMapping
-    public ResponseEntity<String> saveWorkout(@RequestBody WorkoutSaveRequest workoutSaveRequest) {
+    public ResponseEntity<String> saveWorkout(@RequestBody WorkoutSaveRequest workoutSaveRequest,
+                                              HttpServletRequest request) {
+        assertAuthenticatedTelegramId(request, workoutSaveRequest.getTelegramId());
         workoutService.setWorkout(workoutSaveRequest);
         return ResponseEntity.ok("Workout saved successfully!");
     }
@@ -39,16 +45,21 @@ public class WorkoutController {
     }
 
     @PostMapping("/programs")
-    public ResponseEntity<Long> createProgram(@RequestBody ProgramCreateRequest request) {
-        Long programId = workoutService.createTrainingProgram(request);
+    public ResponseEntity<Long> createProgram(@RequestBody ProgramCreateRequest programCreateRequest,
+                                              HttpServletRequest request) {
+        assertAuthenticatedTelegramId(request, programCreateRequest.getTelegramId());
+        Long programId = workoutService.createTrainingProgram(programCreateRequest);
         return ResponseEntity.ok(programId);
     }
 
     @PostMapping("/programs/{programId}/templates")
     public ResponseEntity<String> addTemplateToProgram(
             @PathVariable("programId") Long programId,
-            @RequestBody TemplateCreateRequest request) {
-        workoutService.addTemplateToProgram(programId, request);
+            @RequestParam("telegramId") Long telegramId,
+            @RequestBody TemplateCreateRequest templateCreateRequest,
+            HttpServletRequest request) {
+        assertAuthenticatedTelegramId(request, telegramId);
+        workoutService.addTemplateToProgram(programId, telegramId, templateCreateRequest);
         return ResponseEntity.ok("Template added to program successfully!");
     }
 
@@ -58,8 +69,11 @@ public class WorkoutController {
     }
 
     @DeleteMapping("/programs/{id}")
-    public ResponseEntity<String> deleteProgram(@PathVariable("id") Long id){
-        workoutService.deleteProgram(id);
+    public ResponseEntity<String> deleteProgram(@PathVariable("id") Long id,
+                                                @RequestParam("telegramId") Long telegramId,
+                                                HttpServletRequest request){
+        assertAuthenticatedTelegramId(request, telegramId);
+        workoutService.deleteProgram(id, telegramId);
         return ResponseEntity.ok("Program deleted successfully!");
     }
 
@@ -79,7 +93,9 @@ public class WorkoutController {
     @PostMapping("/friends/request")
     public ResponseEntity<String> sendFriendRequest(
             @RequestParam("requesterId") Long requesterId,
-            @RequestParam("recipientId") Long recipientId) {
+            @RequestParam("recipientId") Long recipientId,
+            HttpServletRequest request) {
+        assertAuthenticatedTelegramId(request, requesterId);
         workoutService.sendFriendRequest(requesterId, recipientId);
         return ResponseEntity.ok("Friend request sent successfully!");
     }
@@ -87,7 +103,9 @@ public class WorkoutController {
     @PostMapping("/friends/accept")
     public ResponseEntity<String> acceptFriendRequest(
             @RequestParam("requesterId") Long requesterId,
-            @RequestParam("recipientId") Long recipientId) {
+            @RequestParam("recipientId") Long recipientId,
+            HttpServletRequest request) {
+        assertAuthenticatedTelegramId(request, recipientId);
         workoutService.acceptFriendRequest(requesterId, recipientId);
         return ResponseEntity.ok("Friend request accepted successfully!");
     }
@@ -112,9 +130,36 @@ public class WorkoutController {
         return ResponseEntity.ok(workoutService.getPendingRequests(telegramId));
     }
 
-    // ПОЛУЧЕНИЕ ГОТОВЫХ СТАНДАРТНЫХ ПРОГРАММ (Вариант Б)
+    // Получение готовых стандартных программ
     @GetMapping("/predefined")
     public ResponseEntity<List<TrainingProgram>> getPredefinedTemplates() {
         return ResponseEntity.ok(workoutService.getPredefinedPrograms());
+    }
+
+    // старт предустановленной программы - создаёт или возвращает существующую личную копию программы для этого пользователя, чтобы прогресс не был общим на всех
+    @PostMapping("/predefined/{id}/start")
+    public ResponseEntity<TrainingProgram> startPredefinedProgram(
+            @PathVariable("id") Long id,
+            @RequestParam("telegramId") Long telegramId) {
+        TrainingProgram program = workoutService.startPredefinedProgram(telegramId, id);
+        return ResponseEntity.ok(program);
+    }
+
+    @GetMapping("/friends/{friendTelegramId}/profile")
+    public ResponseEntity<FriendProfileResponse> getFriendProfile(
+            @RequestParam("telegramId") Long telegramId,
+            @PathVariable("friendTelegramId") Long friendTelegramId) {
+        return ResponseEntity.ok(workoutService.getFriendProfile(telegramId, friendTelegramId));
+    }
+
+    private void assertAuthenticatedTelegramId(HttpServletRequest request, Long telegramId) {
+        Object authenticatedTelegramId = request.getAttribute(TELEGRAM_USER_ID_ATTRIBUTE);
+        if (authenticatedTelegramId == null) {
+            return;
+        }
+
+        if (!authenticatedTelegramId.equals(telegramId)) {
+            throw new RuntimeException("Telegram id mismatch");
+        }
     }
 }

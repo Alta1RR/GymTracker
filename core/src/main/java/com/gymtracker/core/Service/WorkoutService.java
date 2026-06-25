@@ -11,9 +11,12 @@ import com.gymtracker.core.entity.enums.FriendshipStatus;
 import com.gymtracker.core.entity.enums.ProgressionType;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
+import com.gymtracker.core.dto.FriendProfileResponse;
+import com.gymtracker.core.entity.enums.AchievementTrigger;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class WorkoutService {
@@ -26,6 +29,7 @@ public class WorkoutService {
     private final TemplateExerciseRepository templateExerciseRepository;
     private final FriendshipRepository friendshipRepository;
     private final UserAchievementRepository userAchievementRepository;
+    private final AchievementRepository achievementRepository;
 
     public WorkoutService(AppUserRepository appUserRepository,
                           ExerciseRepository exerciseRepository,
@@ -35,7 +39,8 @@ public class WorkoutService {
                           WorkoutTemplateRepository workoutTemplateRepository,
                           TemplateExerciseRepository templateExerciseRepository,
                           FriendshipRepository friendshipRepository,
-                          UserAchievementRepository userAchievementRepository) {
+                          UserAchievementRepository userAchievementRepository,
+                          AchievementRepository achievementRepository) {
         this.appUserRepository = appUserRepository;
         this.workoutRepository = workoutRepository;
         this.exerciseRepository = exerciseRepository;
@@ -45,6 +50,7 @@ public class WorkoutService {
         this.templateExerciseRepository = templateExerciseRepository;
         this.friendshipRepository = friendshipRepository;
         this.userAchievementRepository = userAchievementRepository;
+        this.achievementRepository = achievementRepository;
     }
 
     @Transactional
@@ -106,6 +112,7 @@ public class WorkoutService {
                 trainingProgramRepository.save(program);
             }
         }
+        awardAchievements(user);
     }
 
     public Long createTrainingProgram(ProgramCreateRequest programCreateRequest) {
@@ -122,9 +129,10 @@ public class WorkoutService {
 
     }
 
-    public void addTemplateToProgram(Long programId, TemplateCreateRequest templateCreateRequest) {
+    public void addTemplateToProgram(Long programId, Long telegramId, TemplateCreateRequest templateCreateRequest) {
         TrainingProgram trainingProgram = trainingProgramRepository.findById(programId)
                 .orElseThrow(() -> new RuntimeException("Программа не найдена"));
+        validateProgramOwner(trainingProgram, telegramId);
 
         WorkoutTemplate workoutTemplate = new WorkoutTemplate();
         workoutTemplate.setName(templateCreateRequest.getName());
@@ -154,8 +162,11 @@ public class WorkoutService {
     }
 
     // Удаление программы
-    public void deleteProgram(Long id){
-        trainingProgramRepository.deleteById(id);
+    public void deleteProgram(Long id, Long telegramId){
+        TrainingProgram trainingProgram = trainingProgramRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Программа не найдена"));
+        validateProgramOwner(trainingProgram, telegramId);
+        trainingProgramRepository.delete(trainingProgram);
     }
 
     public List<WorkoutSetDto> getLatestWorkoutSets(Long telegramId, String workoutName) {
@@ -352,5 +363,124 @@ public class WorkoutService {
     // ПОЛУЧЕНИЕ ПРЕДУСТАНОВЛЕННЫХ ПРОГРАММ С БЭКЕНДА
     public List<TrainingProgram> getPredefinedPrograms() {
         return trainingProgramRepository.findByUserIsNull();
+    }
+
+    // "Запуск" предустановленной программы конкретным пользователем.
+    // Предустановленная программа (user = null) - это общий шаблон для всех.
+    // Чтобы у каждого пользователя был свой независимый прогресс (своя неделя,
+    // свой вес), мы клонируем её в отдельную строку, принадлежащую этому юзеру.
+    @Transactional
+    public TrainingProgram startPredefinedProgram(Long telegramId, Long presetProgramId) {
+        AppUser user = appUserRepository.findByTelegramId(telegramId)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+
+        TrainingProgram preset = trainingProgramRepository.findById(presetProgramId)
+                .orElseThrow(() -> new RuntimeException("Программа не найдена"));
+
+        if (preset.getUser() != null) {
+            throw new RuntimeException("Эта программа уже принадлежит пользователю, клонировать нечего");
+        }
+
+        // Если пользователь уже когда-то начинал именно эту стандартную программу -
+        // отдаём его существующую копию, а не плодим дубликаты
+        Optional<TrainingProgram> existing = trainingProgramRepository.findByUserAndName(user, preset.getName());
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        TrainingProgram clone = new TrainingProgram();
+        clone.setUser(user);
+        clone.setName(preset.getName());
+        clone.setProgressionType(preset.getProgressionType());
+        clone.setCurrentWeek(1);
+        TrainingProgram savedClone = trainingProgramRepository.save(clone);
+
+        for (WorkoutTemplate presetTemplate : preset.getTemplates()) {
+            WorkoutTemplate templateClone = new WorkoutTemplate();
+            templateClone.setName(presetTemplate.getName());
+            templateClone.setTrainingProgram(savedClone);
+            WorkoutTemplate savedTemplateClone = workoutTemplateRepository.save(templateClone);
+
+            int order = 1;
+            for (TemplateExercise sourceExercise : presetTemplate.getTemplates()) {
+                TemplateExercise exerciseClone = new TemplateExercise();
+                exerciseClone.setWorkoutTemplate(savedTemplateClone);
+                exerciseClone.setExercise(sourceExercise.getExercise());
+                exerciseClone.setSequenceOrder(order++);
+                templateExerciseRepository.save(exerciseClone);
+            }
+        }
+
+        // Перечитываем из базы, чтобы в ответе сразу были все склонированные templates
+        return trainingProgramRepository.findById(savedClone.getId()).orElse(savedClone);
+    }
+    public FriendProfileResponse getFriendProfile(Long telegramId, Long friendTelegramId) {
+        AppUser user = appUserRepository.findByTelegramId(telegramId)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+
+        AppUser friend = appUserRepository.findByTelegramId(friendTelegramId)
+                .orElseThrow(() -> new RuntimeException("Друг не найден"));
+
+        if (!areFriends(user, friend)) {
+            throw new RuntimeException("Профиль доступен только для друзей");
+        }
+
+        Long totalWorkouts = workoutRepository.countByUser(friend);
+        Long totalSeconds = workoutRepository.sumDurationInSecondsByUser(friend);
+        Long totalMinutes = totalSeconds / 60;
+
+        return new FriendProfileResponse(
+                friend,
+                totalWorkouts,
+                totalMinutes,
+                workoutRepository.findByUserOrderByDateDesc(friend),
+                userAchievementRepository.findByUser(friend)
+        );
+    }
+
+    private boolean areFriends(AppUser user, AppUser friend) {
+        return friendshipRepository.findByAppUserAndRecipient(user, friend)
+                .filter(f -> f.getStatus() == FriendshipStatus.ACCEPTED)
+                .isPresent()
+                || friendshipRepository.findByAppUserAndRecipient(friend, user)
+                .filter(f -> f.getStatus() == FriendshipStatus.ACCEPTED)
+                .isPresent();
+    }
+
+    private void validateProgramOwner(TrainingProgram trainingProgram, Long telegramId) {
+        if (trainingProgram.getUser() == null || !trainingProgram.getUser().getTelegramId().equals(telegramId)) {
+            throw new RuntimeException("Нет доступа к этой программе");
+        }
+    }
+
+    private void awardAchievements(AppUser user) {
+        Long workoutCount = workoutRepository.countByUser(user);
+        Long totalSeconds = workoutRepository.sumDurationInSecondsByUser(user);
+        long totalHours = totalSeconds / 3600;
+
+        for (Achievement achievement : achievementRepository.findAll()) {
+            if (userAchievementRepository.existsByUserAndAchievement(user, achievement)) {
+                continue;
+            }
+
+            if (isAchievementUnlocked(achievement, workoutCount, totalHours)) {
+                UserAchievement userAchievement = new UserAchievement();
+                userAchievement.setUser(user);
+                userAchievement.setAchievement(achievement);
+                userAchievementRepository.save(userAchievement);
+            }
+        }
+    }
+
+    private boolean isAchievementUnlocked(Achievement achievement, Long workoutCount, long totalHours) {
+        if (achievement.getTriggerType() == AchievementTrigger.WORKOUT_COUNT) {
+            return workoutCount >= achievement.getTriggerValue();
+        }
+
+        if (achievement.getTriggerType() == AchievementTrigger.GYM_HOURS) {
+            return totalHours >= achievement.getTriggerValue();
+        }
+
+        return false;
     }
 }

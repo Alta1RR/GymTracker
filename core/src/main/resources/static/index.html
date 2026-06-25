@@ -200,11 +200,17 @@
 
                     <div class="bg-[#16171D] rounded-xl border border-[#22242D] divide-y divide-[#22242D] max-h-56 overflow-y-auto">
                         <label v-for="ex in filteredExercises" :key="ex.id" class="flex items-center justify-between p-3.5 cursor-pointer active:bg-[#1C1E26]">
-                            <div class="flex flex-col pr-4">
-                                <span class="text-sm font-bold leading-tight">{{ ex.name }}</span>
-                                <span class="text-[10px] text-zinc-500 mt-1 capitalize">
-                                    {{ translateCategory(ex.category) }} • {{ ex.equipment }}
-                                </span>
+                            <div class="flex items-center min-w-0 pr-4">
+                                <div class="w-12 h-12 bg-[#0F1115] border border-[#22242D] rounded-xl overflow-hidden flex items-center justify-center shrink-0 mr-3">
+                                    <img v-if="ex.thumbnailURL || ex.imageURL" :src="ex.thumbnailURL || ex.imageURL" class="w-full h-full object-cover" alt="Превью">
+                                    <span v-else class="text-lg text-zinc-600"><i class="ri-image-line"></i></span>
+                                </div>
+                                <div class="flex flex-col min-w-0">
+                                    <span class="text-sm font-bold leading-tight truncate">{{ ex.name }}</span>
+                                    <span class="text-[10px] text-zinc-500 mt-1 capitalize truncate">
+                                        {{ translateCategory(ex.category) }} • {{ ex.equipment }}
+                                    </span>
+                                </div>
                             </div>
                             <input type="checkbox" :value="ex.id" v-model="selectedExerciseIds" class="w-5 h-5 rounded border-[#22242D] bg-[#0F1115] text-blue-500 focus:ring-blue-500">
                         </label>
@@ -244,8 +250,15 @@
                         <h4 class="text-xs text-zinc-400 uppercase tracking-wider font-bold mb-3">План упражнений:</h4>
                         <div class="space-y-3">
                             <div v-for="(ex, index) in previewExercises" :key="ex.id" class="flex items-center space-x-3">
-                                <div class="text-xs font-bold text-blue-400 bg-blue-500/10 w-6 h-6 rounded-full flex items-center justify-center shrink-0">{{ index + 1 }}</div>
-                                <span class="text-sm text-zinc-200 capitalize font-medium">{{ ex.name }}</span>
+                                <div class="w-12 h-12 bg-[#0F1115] border border-[#22242D] rounded-xl overflow-hidden flex items-center justify-center shrink-0 relative">
+                                    <img v-if="ex.thumbnailURL || ex.imageURL" :src="ex.thumbnailURL || ex.imageURL" class="w-full h-full object-cover" alt="Превью">
+                                    <span v-else class="text-lg text-zinc-600"><i class="ri-image-line"></i></span>
+                                    <span class="absolute -top-1 -right-1 text-[9px] font-black text-white bg-blue-600 w-5 h-5 rounded-full flex items-center justify-center border border-[#16171D]">{{ index + 1 }}</span>
+                                </div>
+                                <div class="min-w-0">
+                                    <span class="text-sm text-zinc-200 capitalize font-medium leading-tight block truncate">{{ ex.name }}</span>
+                                    <span class="text-[10px] text-zinc-500 mt-0.5 capitalize block truncate">{{ translateCategory(ex.category) }} • {{ ex.equipment }}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -482,7 +495,12 @@
             <div v-if="loadingFriends" class="text-center text-zinc-600 text-xs py-2">Загрузка друзей...</div>
             <div v-else-if="friends.length === 0" class="text-zinc-500 text-[10px] py-2 text-center leading-relaxed">У тебя пока нет друзей. Отправь инвайт-ссылку бро, чтобы следить за его прогрессом!</div>
             <div v-else class="space-y-3 max-h-40 overflow-y-auto pr-1 mt-2">
-                <div v-for="friend in friends" :key="friend.id" class="flex items-center space-x-3 bg-[#1C1E26] p-2.5 rounded-xl border border-[#22242D]">
+                <button
+                    v-for="friend in friends"
+                    :key="friend.id"
+                    @click="openFriendProfile(friend)"
+                    class="w-full flex items-center space-x-3 bg-[#1C1E26] hover:bg-[#22242D] p-2.5 rounded-xl border border-[#22242D] text-left transition-all active:scale-[0.99]"
+                >
                     <div class="w-8 h-8 rounded-full overflow-hidden border border-[#22242D] flex items-center justify-center bg-blue-500/10 text-blue-500 font-bold text-xs uppercase shrink-0">
                         <span>{{ friend.telegramUserName ? friend.telegramUserName.charAt(0) : 'А' }}</span>
                     </div>
@@ -490,9 +508,100 @@
                         <div class="text-xs font-bold text-white truncate">{{ friend.telegramUserName || 'Атлет' }}</div>
                         <p class="text-[9px] text-zinc-600 truncate">ID: {{ friend.telegramId }}</p>
                     </div>
-                </div>
+                    <i class="ri-arrow-right-s-line text-zinc-500 text-lg"></i>
+                </button>
             </div>
         </div>
+    </div>
+
+    <!-- ================= FRIEND PROFILE ================= -->
+    <div v-if="activeTab === 'friendProfile'" class="flex-grow flex flex-col justify-start py-4 overflow-y-auto max-h-[82vh] pr-1 space-y-6">
+
+        <div class="flex items-center justify-between">
+            <button @click="switchTab('profile')" class="text-zinc-400 hover:text-white text-sm flex items-center">
+                <i class="ri-arrow-left-line mr-1"></i> Назад
+            </button>
+            <h2 class="text-xl font-bold tracking-tight text-white">Профиль друга</h2>
+        </div>
+
+        <div v-if="loadingFriendProfile" class="text-center text-zinc-500 py-10">
+            Загружаем профиль...
+        </div>
+
+        <template v-else-if="selectedFriendProfile">
+            <div class="bg-[#16171D] border border-[#22242D] rounded-2xl p-5 flex items-center space-x-4 shadow-sm">
+                <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-blue-500 flex items-center justify-center bg-blue-500/10 shrink-0">
+                    <span class="text-2xl font-black text-blue-500 uppercase">
+                        {{ selectedFriendProfile.friend.telegramUserName ? selectedFriendProfile.friend.telegramUserName.charAt(0) : 'А' }}
+                    </span>
+                </div>
+                <div class="overflow-hidden">
+                    <h3 class="text-lg font-black text-white leading-tight truncate">
+                        {{ selectedFriendProfile.friend.telegramUserName || 'Атлет' }}
+                    </h3>
+                    <p class="text-[10px] text-zinc-600 mt-0.5 truncate">
+                        ID: {{ selectedFriendProfile.friend.telegramId }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-[#16171D] border border-[#22242D] rounded-2xl p-4 text-center shadow-sm">
+                    <span class="text-2xl font-black text-blue-500">{{ selectedFriendProfile.totalWorkouts }}</span>
+                    <p class="text-[10px] text-zinc-500 uppercase font-bold tracking-wider mt-1">Тренировок</p>
+                </div>
+                <div class="bg-[#16171D] border border-[#22242D] rounded-2xl p-4 text-center shadow-sm">
+                    <span class="text-2xl font-black text-indigo-500">{{ selectedFriendProfile.totalTrainingMinutes }}</span>
+                    <p class="text-[10px] text-zinc-500 uppercase font-bold tracking-wider mt-1">Минут в зале</p>
+                </div>
+            </div>
+
+            <div class="bg-[#16171D] border border-[#22242D] rounded-2xl p-5 space-y-4 shadow-sm">
+                <h4 class="text-xs uppercase tracking-wider text-zinc-500 font-bold flex items-center">
+                    <i class="ri-award-line mr-1.5 text-sm"></i> Ачивки друга
+                </h4>
+
+                <div v-if="selectedFriendProfile.achievements.length === 0" class="text-zinc-500 text-[10px] text-center">
+                    У друга пока нет полученных ачивок
+                </div>
+
+                <div v-else class="grid grid-cols-3 gap-3">
+                    <div
+                        v-for="ua in selectedFriendProfile.achievements"
+                        :key="ua.id"
+                        class="flex flex-col items-center text-center p-3 rounded-xl border bg-blue-500/5 border-blue-500/20 shadow-md shadow-blue-500/10"
+                    >
+                        <div class="text-3xl mb-2">{{ ua.achievement.icon }}</div>
+                        <span class="text-[10px] font-black text-white leading-tight mb-1">{{ ua.achievement.name }}</span>
+                        <span class="text-[8px] text-zinc-400 leading-tight">{{ ua.achievement.description }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-[#16171D] border border-[#22242D] rounded-2xl p-5 space-y-4 shadow-sm mb-10">
+                <h4 class="text-xs uppercase tracking-wider text-zinc-500 font-bold flex items-center">
+                    <i class="ri-history-line mr-1.5 text-sm"></i> Последние тренировки
+                </h4>
+
+                <div v-if="selectedFriendProfile.history.length === 0" class="text-zinc-500 text-[10px] text-center">
+                    История тренировок пока пустая
+                </div>
+
+                <div v-else class="space-y-3">
+                    <div
+                        v-for="workout in selectedFriendProfile.history"
+                        :key="workout.id"
+                        class="bg-[#1C1E26] border border-[#22242D] rounded-xl p-3"
+                    >
+                        <div class="flex items-center justify-between">
+                            <div class="text-sm font-bold text-white truncate">{{ workout.name }}</div>
+                            <div class="text-[10px] text-zinc-500 shrink-0">{{ formatDurationMinutes(workout.durationInSeconds) }}</div>
+                        </div>
+                        <div class="text-[10px] text-zinc-600 mt-1">{{ formatDate(workout.date) }}</div>
+                    </div>
+                </div>
+            </div>
+        </template>
     </div>
 
     <!-- ================= BOTTOM NAVIGATION TAB BAR (Исправлено: Векторная гантель SVG) ================= -->
@@ -576,6 +685,13 @@
             const tgUserPhoto = ref(null);
             const tg = window.Telegram?.WebApp;
 
+            axios.interceptors.request.use(config => {
+                if (tg?.initData) {
+                    config.headers['X-Telegram-Init-Data'] = tg.initData;
+                }
+                return config;
+            });
+
             const workoutDuration = ref(0);
             let timerInterval = null;
 
@@ -589,6 +705,9 @@
             const allAchievements = ref([]);
             const earnedAchievements = ref([]);
             const loadingAchievements = ref(false);
+
+            const selectedFriendProfile = ref(null);
+            const loadingFriendProfile = ref(false);
 
             const newProgramName = ref("");
             const newProgramType = ref("LINEAR");
@@ -802,6 +921,26 @@
                 }
             };
 
+
+            const openFriendProfile = async (friend) => {
+                loadingFriendProfile.value = true;
+                selectedFriendProfile.value = null;
+                activeTab.value = 'friendProfile';
+
+                try {
+                    const response = await axios.get(`/api/workouts/friends/${friend.telegramId}/profile`, {
+                        params: { telegramId: telegramId.value }
+                    });
+                    selectedFriendProfile.value = response.data;
+                } catch (error) {
+                    console.error("Ошибка загрузки профиля друга:", error);
+                    alert("Не удалось открыть профиль друга.");
+                    switchTab('profile');
+                } finally {
+                    loadingFriendProfile.value = false;
+                }
+            };
+
             const sendFriendRequest = async () => {
                 const recipientId = prompt("Введи Telegram ID твоего друга для отправки запроса:");
                 if (!recipientId) return;
@@ -877,12 +1016,28 @@
                 }
             };
 
-            const openWorkoutPreview = (program, template) => {
-                activeProgram.value = program;
+            const openWorkoutPreview = async (program, template) => {
+                let resolvedProgram = program;
+
+                // Если это предустановленная (общая на всех) программа - сначала
+                // получаем личную копию пользователя, чтобы прогресс/неделя
+                // не были общими для всех, кто выбрал этот же пресет
+                if (program && program.user === null) {
+                    try {
+                        resolvedProgram = (await axios.post(`/api/workouts/predefined/${program.id}/start`, null, {
+                            params: { telegramId: telegramId.value }
+                        })).data;
+                    } catch (error) {
+                        console.error("Не удалось начать предустановленную программу:", error);
+                        alert("Не удалось загрузить программу, попробуй ещё раз.");
+                        return;
+                    }
+                }
+
+                activeProgram.value = resolvedProgram;
                 activeTemplate.value = template;
 
-                // Поскольку все тренировки теперь идут из Базы Данных бэкенда,
-                // мы просто достаем чистый список упражнений из связующей таблицы!
+
                 previewExercises.value = template.templates ? template.templates.map(t => t.exercise) : [];
 
                 workoutSubScreen.value = 'preview';
@@ -912,7 +1067,9 @@
                     return;
                 }
                 try {
-                    await axios.delete(`/api/workouts/programs/${programId}`);
+                    await axios.delete(`/api/workouts/programs/${programId}`, {
+                        params: { telegramId: telegramId.value }
+                    });
                     alert("Программа успешно удалена!");
                     loadCustomPrograms();
                 } catch (error) {
@@ -960,6 +1117,8 @@
                     await axios.post(`/api/workouts/programs/${programId}/templates`, {
                         name: newTemplateName.value,
                         exerciseIds: selectedExerciseIds.value
+                    }, {
+                        params: { telegramId: telegramId.value }
                     });
 
                     alert(isAddingDayOnly.value ? "Новый день успешно добавлен!" : "Программа тренировок успешно создана!");
@@ -984,8 +1143,10 @@
             };
 
             const initWorkout = async (exerciseList, templateName, programId) => {
+
                 activeExercises.value = [];
                 workoutSubScreen.value = 'active_workout';
+                selectedProgramId.value = programId;
 
                 let latestSetsMap = {};
                 try {
@@ -1085,6 +1246,8 @@
 
                 try {
                     await axios.post('/api/workouts', payload);
+                    await loadEarnedAchievements();
+                    await loadHistoryData();
                     alert(`Тренировка записана! Время: ${formattedDuration.value}`);
                     if (timerInterval) clearInterval(timerInterval);
                     switchTab('workouts');
@@ -1162,6 +1325,8 @@
                 loadingHistory,
                 friends,
                 loadingFriends,
+                selectedFriendProfile,
+                loadingFriendProfile,
                 allAchievements,
                 earnedAchievements,
                 loadingAchievements,
@@ -1192,6 +1357,7 @@
                 totalTrainingTime,
                 sendFriendRequest,
                 shareInviteLink,
+                openFriendProfile,
                 isAchievementEarned,
                 acceptIncomingRequest,
                 acceptFriendRequest,

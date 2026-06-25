@@ -12,7 +12,7 @@ public class BotConfig {
 
     @Bean
     public TelegramBotsApi telegramBotsApi(GymBot gymBot) throws TelegramApiException {
-        // Инициализируем API телеграма
+        // Инициализируем API тг
         TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
 
         botsApi.registerBot(gymBot);

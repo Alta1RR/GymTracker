@@ -25,7 +25,7 @@ public class TrainingProgram {
     private Integer currentWeek;
 
     @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id")
     private AppUser user;
 
     @OneToMany(mappedBy = "trainingProgram", cascade = CascadeType.ALL, fetch = FetchType.EAGER)

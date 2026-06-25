@@ -133,7 +133,7 @@ public class DatabaseInitializer implements CommandLineRunner {
         }
     }
 
-    // Вспомогательный метод для создания дней внутри стандартной программы
+    // метод для создания "дней" внутри стандартной программы
     private void createPredefinedTemplate(TrainingProgram program, String templateName, String[] exerciseQueries) {
         WorkoutTemplate template = new WorkoutTemplate();
         template.setName(templateName);

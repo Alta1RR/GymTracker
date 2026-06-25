@@ -25,4 +25,9 @@ public interface WorkoutRepository extends JpaRepository<Workout, Long> {
     Double findMax1RM(@Param("user") AppUser user, @Param("exercise") Exercise exercise);
 
     List<Workout> findByUserOrderByDateDesc(AppUser user);
+
+    Long countByUser(AppUser user);
+
+    @Query("SELECT COALESCE(SUM(w.durationInSeconds), 0) FROM Workout w WHERE w.user = :user")
+    Long sumDurationInSecondsByUser(@Param("user") AppUser user);
 }
