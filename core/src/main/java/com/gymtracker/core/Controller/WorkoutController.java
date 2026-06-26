@@ -4,7 +4,9 @@ import com.gymtracker.core.Repository.AchievementRepository;
 import com.gymtracker.core.Repository.ExerciseRepository;
 import com.gymtracker.core.Service.WorkoutService;
 import com.gymtracker.core.dto.ProgramCreateRequest;
+import com.gymtracker.core.dto.ProgramUpdateRequest;
 import com.gymtracker.core.dto.TemplateCreateRequest;
+import com.gymtracker.core.dto.TemplateUpdateRequest;
 import com.gymtracker.core.dto.WorkoutSaveRequest;
 import com.gymtracker.core.dto.WorkoutSetDto;
 import com.gymtracker.core.entity.*;
@@ -68,6 +70,15 @@ public class WorkoutController {
         return ResponseEntity.ok(workoutService.getProgramsByUserId(telegramId));
     }
 
+    @PutMapping("/programs/{id}")
+    public ResponseEntity<TrainingProgram> updateProgram(
+            @PathVariable("id") Long id,
+            @RequestBody ProgramUpdateRequest programUpdateRequest,
+            HttpServletRequest request) {
+        assertAuthenticatedTelegramId(request, programUpdateRequest.getTelegramId());
+        return ResponseEntity.ok(workoutService.updateProgram(id, programUpdateRequest));
+    }
+
     @DeleteMapping("/programs/{id}")
     public ResponseEntity<String> deleteProgram(@PathVariable("id") Long id,
                                                 @RequestParam("telegramId") Long telegramId,
@@ -75,6 +86,25 @@ public class WorkoutController {
         assertAuthenticatedTelegramId(request, telegramId);
         workoutService.deleteProgram(id, telegramId);
         return ResponseEntity.ok("Program deleted successfully!");
+    }
+
+    @PutMapping("/templates/{id}")
+    public ResponseEntity<WorkoutTemplate> updateTemplate(
+            @PathVariable("id") Long id,
+            @RequestBody TemplateUpdateRequest templateUpdateRequest,
+            HttpServletRequest request) {
+        assertAuthenticatedTelegramId(request, templateUpdateRequest.getTelegramId());
+        return ResponseEntity.ok(workoutService.updateTemplate(id, templateUpdateRequest));
+    }
+
+    @DeleteMapping("/templates/{id}")
+    public ResponseEntity<String> deleteTemplate(
+            @PathVariable("id") Long id,
+            @RequestParam("telegramId") Long telegramId,
+            HttpServletRequest request) {
+        assertAuthenticatedTelegramId(request, telegramId);
+        workoutService.deleteTemplate(id, telegramId);
+        return ResponseEntity.ok("Template deleted successfully!");
     }
 
     @GetMapping("/latest")

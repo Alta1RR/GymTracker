@@ -2,7 +2,10 @@ package com.gymtracker.core.Service;
 
 import com.gymtracker.core.Repository.*;
 import com.gymtracker.core.dto.ProgramCreateRequest;
+import com.gymtracker.core.dto.ProgramUpdateRequest;
 import com.gymtracker.core.dto.TemplateCreateRequest;
+import com.gymtracker.core.dto.TemplateExerciseUpdateRequest;
+import com.gymtracker.core.dto.TemplateUpdateRequest;
 import com.gymtracker.core.dto.WorkoutSaveRequest;
 import com.gymtracker.core.dto.WorkoutSetDto;
 import com.gymtracker.core.entity.*;
@@ -15,7 +18,9 @@ import com.gymtracker.core.dto.FriendProfileResponse;
 import com.gymtracker.core.entity.enums.AchievementTrigger;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -62,6 +67,9 @@ public class WorkoutService {
         workout.setUser(user);
         workout.setName(workoutSaveRequest.getWorkoutName());
         workout.setDurationInSeconds(workoutSaveRequest.getDurationInSeconds());
+        workout.setQualityScorePercent(workoutSaveRequest.getQualityScorePercent());
+        workout.setPlannedVolume(workoutSaveRequest.getPlannedVolume());
+        workout.setActualVolume(workoutSaveRequest.getActualVolume());
 
         // Если тренировка находится в рамках к-л программы
         if(workoutSaveRequest.getProgramId() != null){
@@ -86,6 +94,7 @@ public class WorkoutService {
             workoutSet.setSetNumber(setDto.getSetNumber());
             workoutSet.setWeight(setDto.getWeight());
             workoutSet.setReps(setDto.getReps());
+            workoutSet.setExtraSet(Boolean.TRUE.equals(setDto.getExtraSet()));
 
             workoutSetRepository.save(workoutSet);
         }
@@ -149,10 +158,54 @@ public class WorkoutService {
             templateExercise.setWorkoutTemplate(savedTemplate);
             templateExercise.setExercise(exercise);
             templateExercise.setSequenceOrder(order);
+            templateExercise.setTargetSets(3);
 
             templateExerciseRepository.save(templateExercise);
             order++;
         }
+    }
+
+    public TrainingProgram updateProgram(Long programId, ProgramUpdateRequest request) {
+        TrainingProgram program = trainingProgramRepository.findById(programId)
+                .orElseThrow(() -> new RuntimeException("Программа не найдена"));
+        validateProgramOwner(program, request.getTelegramId());
+        program.setName(request.getName());
+        return trainingProgramRepository.save(program);
+    }
+
+    @Transactional
+    public WorkoutTemplate updateTemplate(Long templateId, TemplateUpdateRequest request) {
+        WorkoutTemplate template = workoutTemplateRepository.findById(templateId)
+                .orElseThrow(() -> new RuntimeException("Тренировочный день не найден"));
+        validateProgramOwner(template.getTrainingProgram(), request.getTelegramId());
+
+        template.setName(request.getName());
+        WorkoutTemplate savedTemplate = workoutTemplateRepository.save(template);
+
+        List<TemplateExercise> oldExercises = templateExerciseRepository.findByWorkoutTemplate(savedTemplate);
+        templateExerciseRepository.deleteAll(oldExercises);
+
+        int order = 1;
+        for (TemplateExerciseUpdateRequest item : request.getExercises()) {
+            Exercise exercise = exerciseRepository.findById(item.getExerciseId())
+                    .orElseThrow(() -> new RuntimeException("Упражнение не найдено"));
+
+            TemplateExercise templateExercise = new TemplateExercise();
+            templateExercise.setWorkoutTemplate(savedTemplate);
+            templateExercise.setExercise(exercise);
+            templateExercise.setSequenceOrder(order++);
+            templateExercise.setTargetSets(item.getTargetSets() == null || item.getTargetSets() < 1 ? 1 : item.getTargetSets());
+            templateExerciseRepository.save(templateExercise);
+        }
+
+        return workoutTemplateRepository.findById(templateId).orElse(savedTemplate);
+    }
+
+    public void deleteTemplate(Long templateId, Long telegramId) {
+        WorkoutTemplate template = workoutTemplateRepository.findById(templateId)
+                .orElseThrow(() -> new RuntimeException("Тренировочный день не найден"));
+        validateProgramOwner(template.getTrainingProgram(), telegramId);
+        workoutTemplateRepository.delete(template);
     }
 
     public List<TrainingProgram> getProgramsByUserId(Long telegramId) {
@@ -180,95 +233,84 @@ public class WorkoutService {
             return new ArrayList<>();
         }
 
-        List<WorkoutSet> lastSets = workoutSetRepository.findByWorkout(latestWorkout);
+        List<WorkoutSet> lastSets = workoutSetRepository.findByWorkout(latestWorkout)
+                .stream()
+                .filter(set -> !Boolean.TRUE.equals(set.getExtraSet()))
+                .toList();
         if (lastSets.isEmpty()) {
             return new ArrayList<>();
         }
-        WorkoutSet bestSet = lastSets.get(0);
-        double lastWeight = bestSet.getWeight();
-        int lastReps = bestSet.getReps();
-
-        // Базовые переменные для расчетов
-        double finalWeight = 0.0;
-        int targetReps = 10;
-        int targetSetsCount = 3;
-
-        ProgressionType progType = latestWorkout.getTrainingProgram().getProgressionType();
-
-        if (progType == ProgressionType.LINEAR) {
-            targetSetsCount = lastSets.size(); // оставляем столько же подходов
-
-            if (bestSet.getExercise().getType() == ExerciseType.BODYWEIGHT) {
-                finalWeight = 0.0;
-                targetReps = lastReps + 1; // прибавляем 1 повторение для своего веса
-            } else {
-                finalWeight = lastWeight + 2.5; // прибавляем 2.5 кг для штанги
-                targetReps = lastReps;
-            }
-
-        } else if (progType == ProgressionType.PERIODIZED) {
-            double estimated1RM = lastWeight * (1 + lastReps / 30.0); // Считаем 1ПМ по формуле Эпли
-            int currentWeek = latestWorkout.getTrainingProgram().getCurrentWeek();
-            double intensity = 1.0;
-
-            switch (currentWeek) {
-                case 1:
-                    intensity = 0.70;
-                    targetReps = 10;
-                    targetSetsCount = 3;
-                    break;
-                case 2:
-                    intensity = 0.775;
-                    targetReps = 8;
-                    targetSetsCount = 3;
-                    break;
-                case 3:
-                    intensity = 0.85;
-                    targetReps = 5;
-                    targetSetsCount = 4; // 4 подхода на тяжелой неделе
-                    break;
-                case 4:
-                    intensity = 0.60;
-                    targetReps = 8;
-                    targetSetsCount = 2; // 2 подхода на легкой неделе
-                    break;
-            }
-
-            double calculatedWeight = estimated1RM * intensity;
-            finalWeight = Math.round(calculatedWeight / 2.5) * 2.5; // Округляем до 2.5 кг
-
-        } else {
-            targetSetsCount = lastSets.size();
-            finalWeight = lastWeight;
-            targetReps = lastReps;
-        }
 
         List<WorkoutSetDto> targetDtos = new ArrayList<>();
-        for (int i = 1; i <= targetSetsCount; i++) {
-            WorkoutSetDto dto = new WorkoutSetDto();
-            dto.setExerciseId(bestSet.getExercise().getId());
-            dto.setSetNumber(i);
+        ProgressionType progType = latestWorkout.getTrainingProgram() != null
+                ? latestWorkout.getTrainingProgram().getProgressionType()
+                : ProgressionType.MANUAL;
 
-            if (bestSet.getExercise().getType() == ExerciseType.BODYWEIGHT) {
-                dto.setWeight(0.0);
-                if (progType == ProgressionType.PERIODIZED) {
-                    double intensity = 1.0;
-                    int week = latestWorkout.getTrainingProgram().getCurrentWeek();
-                    if (week == 1) intensity = 0.70;
-                    else if (week == 2) intensity = 0.775;
-                    else if (week == 3) intensity = 0.85;
-                    else if (week == 4) intensity = 0.60;
+        Map<Long, List<WorkoutSet>> setsByExercise = new LinkedHashMap<>();
+        for (WorkoutSet set : lastSets) {
+            setsByExercise.computeIfAbsent(set.getExercise().getId(), id -> new ArrayList<>()).add(set);
+        }
 
-                    dto.setReps((int) Math.round(lastReps * intensity));
+        for (List<WorkoutSet> exerciseSets : setsByExercise.values()) {
+            WorkoutSet bestSet = exerciseSets.get(0);
+            double lastWeight = bestSet.getWeight();
+            int lastReps = bestSet.getReps();
+            double finalWeight = lastWeight;
+            int targetReps = lastReps;
+            int targetSetsCount = exerciseSets.size();
+
+            if (progType == ProgressionType.LINEAR) {
+                if (bestSet.getExercise().getType() == ExerciseType.BODYWEIGHT) {
+                    finalWeight = 0.0;
+                    targetReps = lastReps + 1;
                 } else {
-                    dto.setReps(targetReps);
+                    finalWeight = lastWeight + 2.5;
                 }
-            } else {
-                dto.setWeight(finalWeight);
-                dto.setReps(targetReps);
+            } else if (progType == ProgressionType.PERIODIZED) {
+                double estimated1RM = lastWeight * (1 + lastReps / 30.0);
+                int currentWeek = latestWorkout.getTrainingProgram().getCurrentWeek();
+                double intensity = 1.0;
+
+                switch (currentWeek) {
+                    case 1:
+                        intensity = 0.70;
+                        targetReps = 10;
+                        targetSetsCount = 3;
+                        break;
+                    case 2:
+                        intensity = 0.775;
+                        targetReps = 8;
+                        targetSetsCount = 3;
+                        break;
+                    case 3:
+                        intensity = 0.85;
+                        targetReps = 5;
+                        targetSetsCount = 4;
+                        break;
+                    case 4:
+                        intensity = 0.60;
+                        targetReps = 8;
+                        targetSetsCount = 2;
+                        break;
+                }
+
+                if (bestSet.getExercise().getType() == ExerciseType.BODYWEIGHT) {
+                    finalWeight = 0.0;
+                    targetReps = (int) Math.round(lastReps * intensity);
+                } else {
+                    double calculatedWeight = estimated1RM * intensity;
+                    finalWeight = Math.round(calculatedWeight / 2.5) * 2.5;
+                }
             }
 
-            targetDtos.add(dto);
+            for (int i = 1; i <= targetSetsCount; i++) {
+                WorkoutSetDto dto = new WorkoutSetDto();
+                dto.setExerciseId(bestSet.getExercise().getId());
+                dto.setSetNumber(i);
+                dto.setWeight(bestSet.getExercise().getType() == ExerciseType.BODYWEIGHT ? 0.0 : finalWeight);
+                dto.setReps(targetReps);
+                targetDtos.add(dto);
+            }
         }
 
         return targetDtos;

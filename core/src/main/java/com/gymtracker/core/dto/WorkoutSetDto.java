@@ -8,4 +8,5 @@ public class WorkoutSetDto {
     private Integer setNumber;
     private Double weight;
     private Integer reps;
+    private Boolean extraSet;
 }

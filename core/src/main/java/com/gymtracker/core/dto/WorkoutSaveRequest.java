@@ -11,4 +11,7 @@ public class WorkoutSaveRequest {
     private List<WorkoutSetDto> sets;
     private Integer durationInSeconds;
     private Long programId;
+    private Integer qualityScorePercent;
+    private Double plannedVolume;
+    private Double actualVolume;
 }

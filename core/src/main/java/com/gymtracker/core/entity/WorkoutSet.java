@@ -19,6 +19,8 @@ public class WorkoutSet {
 
     private Integer reps;
 
+    private Boolean extraSet = false;
+
     @JsonIgnore
     @ManyToOne
     @JoinColumn(name = "workout_id", nullable = false)

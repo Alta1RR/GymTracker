@@ -75,24 +75,45 @@
                         <span class="text-xs text-zinc-400 uppercase tracking-wider font-extrabold flex items-center">
                             <i class="ri-folder-shield-2-line mr-1.5 text-blue-500"></i> {{ prog.name }}
                         </span>
-                        <button @click="deleteProgram(prog.id, prog.name)" class="text-red-500/80 hover:text-red-400 transition-colors text-xs font-semibold p-1 flex items-center">
-                            <i class="ri-delete-bin-6-line mr-1"></i> Удалить
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button @click="openProgramEditor(prog)" class="text-blue-400 hover:text-blue-300 transition-colors text-xs font-semibold p-1 flex items-center">
+                                <i class="ri-edit-line mr-1"></i> Изменить
+                            </button>
+                            <button @click="deleteProgram(prog.id, prog.name)" class="text-red-500/80 hover:text-red-400 transition-colors text-xs font-semibold p-1 flex items-center">
+                                <i class="ri-delete-bin-6-line mr-1"></i> Удалить
+                            </button>
+                        </div>
                     </div>
 
                     <div class="space-y-3">
                         <div v-for="(temp, tempIndex) in prog.templates" :key="temp.id"
-                             @click="openWorkoutPreview(prog, temp)"
-                             class="bg-[#1C1E26] hover:bg-[#22242D] p-4 rounded-xl border border-[#22242D]/60 cursor-pointer transition-all active:scale-[0.99] flex justify-between items-center">
+                             @click="openProgramTemplate(prog, temp, tempIndex)"
+                             class="p-4 rounded-xl border cursor-pointer transition-all active:scale-[0.99] flex justify-between items-center"
+                             :class="getTemplateStatus(prog, temp, tempIndex) === 'done'
+                                ? 'bg-[#14161C] border-[#22242D]/60 opacity-55'
+                                : getTemplateStatus(prog, temp, tempIndex) === 'next'
+                                    ? 'bg-blue-500/10 border-blue-500/50 shadow-lg shadow-blue-500/10'
+                                    : 'bg-[#1C1E26] hover:bg-[#22242D] border-[#22242D]/60'">
                             <div>
-                                <h4 class="font-bold text-sm text-white">{{ temp.name }}</h4>
+                                <h4 class="font-bold text-sm text-white flex items-center">
+                                    <i v-if="getTemplateStatus(prog, temp, tempIndex) === 'done'" class="ri-checkbox-circle-fill text-emerald-500 mr-1.5"></i>
+                                    <i v-else-if="getTemplateStatus(prog, temp, tempIndex) === 'next'" class="ri-play-circle-fill text-blue-500 mr-1.5"></i>
+                                    {{ temp.name }}
+                                </h4>
                                 <p class="text-[11px] text-zinc-500 mt-0.5 flex items-center">
-                                    <i class="ri-list-check-3 mr-1"></i> Упражнений: {{ temp.templates ? temp.templates.length : 0 }}
+                                    <i class="ri-list-check-3 mr-1"></i>
+                                    <span v-if="getTemplateStatus(prog, temp, tempIndex) === 'done'">Готово на этой неделе</span>
+                                    <span v-else-if="getTemplateStatus(prog, temp, tempIndex) === 'next'">Следующая тренировка</span>
+                                    <span v-else>Упражнений: {{ temp.templates ? temp.templates.length : 0 }}</span>
                                 </p>
                             </div>
                             <div class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-sm"
-                                 :class="getBadgeBg(tempIndex)">
+                                 :class="getTemplateStatus(prog, temp, tempIndex) === 'done' ? 'bg-emerald-600' : getTemplateStatus(prog, temp, tempIndex) === 'next' ? 'bg-blue-600' : getBadgeBg(tempIndex)">
+                                <i v-if="getTemplateStatus(prog, temp, tempIndex) === 'done'" class="ri-check-line text-base"></i>
+                                <i v-else-if="getTemplateStatus(prog, temp, tempIndex) === 'next'" class="ri-arrow-right-line text-base"></i>
+                                <span v-else>
                                 {{ getInitials(temp.name) }}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -225,8 +246,78 @@
             </button>
         </div>
 
+        <!-- SUB-SCREEN: PROGRAM EDITOR -->
+        <div v-if="workoutSubScreen === 'edit_program'" class="py-2 pb-8">
+            <div class="flex items-center space-x-2 mb-6">
+                <button @click="workoutSubScreen = 'templates'" class="text-zinc-400 hover:text-white text-sm flex items-center">
+                    <i class="ri-arrow-left-line mr-1"></i> К программам
+                </button>
+            </div>
+
+            <h2 class="text-xl font-bold tracking-tight text-white mb-6">Редактирование программы</h2>
+
+            <div v-if="editingProgram" class="space-y-5">
+                <div class="bg-[#16171D] border border-[#22242D] rounded-2xl p-4 space-y-3">
+                    <label class="block text-xs text-zinc-500 uppercase font-bold tracking-wider">Название программы</label>
+                    <input type="text" v-model="editingProgramName"
+                           class="w-full bg-[#0F1115] border border-[#22242D] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                    <button @click="saveProgramName"
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-xs transition-all active:scale-[0.99]">
+                        СОХРАНИТЬ НАЗВАНИЕ
+                    </button>
+                </div>
+
+                <div v-for="template in editingTemplates" :key="template.id" class="bg-[#16171D] border border-[#22242D] rounded-2xl p-4 space-y-4">
+                    <div class="flex items-center justify-between gap-3">
+                        <input type="text" v-model="template.name"
+                               class="min-w-0 flex-1 bg-[#0F1115] border border-[#22242D] rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors">
+                        <button @click="deleteEditingTemplate(template)"
+                                class="text-red-500/80 hover:text-red-400 text-xs font-bold shrink-0">
+                            <i class="ri-delete-bin-6-line"></i>
+                        </button>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div v-for="item in template.items" :key="item.localId" class="bg-[#0F1115] border border-[#22242D] rounded-xl p-3 flex items-center gap-3">
+                            <div class="w-10 h-10 bg-[#16171D] border border-[#22242D] rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+                                <img v-if="item.exercise.thumbnailURL || item.exercise.imageURL" :src="item.exercise.thumbnailURL || item.exercise.imageURL" class="w-full h-full object-cover" alt="Превью">
+                                <i v-else class="ri-image-line text-zinc-600"></i>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-sm font-bold text-white truncate capitalize">{{ item.exercise.name }}</div>
+                                <div class="text-[10px] text-zinc-500 truncate">{{ translateCategory(item.exercise.category) }} • {{ item.exercise.equipment }}</div>
+                            </div>
+                            <input type="number" min="1" max="10" v-model.number="item.targetSets"
+                                   class="w-14 bg-[#16171D] border border-[#22242D] rounded-lg px-2 py-2 text-xs text-center text-white focus:outline-none focus:border-blue-500">
+                            <button @click="removeExerciseFromEditingTemplate(template, item.localId)" class="text-zinc-500 hover:text-red-400">
+                                <i class="ri-close-line"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-[1fr_auto] gap-2">
+                        <select v-model="template.exerciseToAdd"
+                                class="bg-[#0F1115] border border-[#22242D] rounded-xl px-3 py-2.5 text-xs text-zinc-300 focus:outline-none focus:border-blue-500 min-w-0">
+                            <option :value="null">Добавить упражнение</option>
+                            <option v-for="ex in allExercises" :key="ex.id" :value="ex.id">{{ ex.name }}</option>
+                        </select>
+                        <button @click="addExerciseToEditingTemplate(template)"
+                                class="bg-[#1C1E26] hover:bg-[#22242D] text-zinc-300 px-4 rounded-xl border border-[#22242D]">
+                            <i class="ri-add-line"></i>
+                        </button>
+                    </div>
+
+                    <button @click="saveEditingTemplate(template)"
+                            :disabled="!template.name || template.items.length === 0"
+                            class="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-30 disabled:pointer-events-none text-white font-bold py-3 rounded-xl text-xs transition-all active:scale-[0.99]">
+                        СОХРАНИТЬ ДЕНЬ
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- ================= SUB-SCREEN: WORKOUT PREVIEW ================= -->
-        <div v-if="workoutSubScreen === 'preview'" class="py-2 flex flex-col justify-between min-h-[80vh]">
+        <div v-if="workoutSubScreen === 'preview'" class="py-2 pb-28">
             <div>
                 <div class="flex items-center space-x-2 mb-6">
                     <button @click="workoutSubScreen = 'templates'" class="text-zinc-400 hover:text-white text-sm flex items-center">
@@ -249,11 +340,10 @@
                     <div class="border-t border-[#22242D] pt-4">
                         <h4 class="text-xs text-zinc-400 uppercase tracking-wider font-bold mb-3">План упражнений:</h4>
                         <div class="space-y-3">
-                            <div v-for="(ex, index) in previewExercises" :key="ex.id" class="flex items-center space-x-3">
-                                <div class="w-12 h-12 bg-[#0F1115] border border-[#22242D] rounded-xl overflow-hidden flex items-center justify-center shrink-0 relative">
+                            <div v-for="ex in previewExercises" :key="ex.id" class="flex items-center space-x-3">
+                                <div class="w-12 h-12 bg-[#0F1115] border border-[#22242D] rounded-xl overflow-hidden flex items-center justify-center shrink-0">
                                     <img v-if="ex.thumbnailURL || ex.imageURL" :src="ex.thumbnailURL || ex.imageURL" class="w-full h-full object-cover" alt="Превью">
                                     <span v-else class="text-lg text-zinc-600"><i class="ri-image-line"></i></span>
-                                    <span class="absolute -top-1 -right-1 text-[9px] font-black text-white bg-blue-600 w-5 h-5 rounded-full flex items-center justify-center border border-[#16171D]">{{ index + 1 }}</span>
                                 </div>
                                 <div class="min-w-0">
                                     <span class="text-sm text-zinc-200 capitalize font-medium leading-tight block truncate">{{ ex.name }}</span>
@@ -265,10 +355,12 @@
                 </div>
             </div>
 
-            <button @click="startActiveWorkout"
-                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl text-base tracking-wide transition-all active:scale-[0.99] shadow-lg shadow-blue-600/10 flex items-center justify-center">
-                <i class="ri-flashlight-line mr-2 text-lg"></i> НАЧАТЬ ТРЕНИРОВКУ
-            </button>
+            <div class="fixed bottom-20 left-0 right-0 max-w-md mx-auto px-4 z-30">
+                <button @click="startActiveWorkout"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl text-base tracking-wide transition-all active:scale-[0.99] shadow-lg shadow-blue-600/10 flex items-center justify-center">
+                    <i class="ri-flashlight-line mr-2 text-lg"></i> НАЧАТЬ ТРЕНИРОВКУ
+                </button>
+            </div>
         </div>
 
         <!-- SUB-SCREEN: ACTIVE WORKOUT -->
@@ -354,10 +446,107 @@
         </div>
     </div>
 
-    <!-- ================= TAB 2: WORKOUT HISTORY ================= -->
+    <!-- ================= TAB 2: REPORT ================= -->
     <div v-if="activeTab === 'history'" class="flex-grow flex flex-col justify-between py-2 overflow-y-auto max-h-[85vh]">
-        <div>
+        <div v-if="reportSubScreen === 'summary'" class="space-y-5">
             <div class="flex items-center space-x-2 mb-6">
+                <h2 class="text-xl font-bold tracking-tight text-white">Отчёт</h2>
+            </div>
+
+            <div v-if="loadingHistory" class="text-center text-zinc-500 py-10">Загрузка твоей истории...</div>
+
+            <div v-else-if="workoutHistory.length === 0" class="text-center text-zinc-500 py-10 text-sm">
+                У тебя пока нет выполненных тренировок. Время сделать первую!
+            </div>
+
+            <div v-else class="space-y-5">
+                <div class="bg-[#16171D] border border-[#22242D] rounded-2xl p-5 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-black text-white">Качество тренировок</h3>
+                        <select v-model="reportProgramFilter"
+                                class="bg-[#0F1115] border border-[#22242D] rounded-lg px-2.5 py-1.5 text-[10px] text-zinc-300 focus:outline-none focus:border-blue-500 max-w-44">
+                            <option value="all">Все программы</option>
+                            <option v-for="program in reportProgramOptions" :key="program.id" :value="String(program.id)">
+                                {{ program.name }}
+                            </option>
+                            <option value="none">Без программы</option>
+                        </select>
+                    </div>
+
+                    <div class="h-44 bg-[#0F1115] border border-[#22242D] rounded-xl p-3 flex items-end gap-1.5">
+                        <div v-for="point in reportChartPoints" :key="point.id" class="flex-1 h-full flex flex-col justify-end items-center gap-1">
+                            <div class="w-full min-w-[6px] rounded-t transition-all"
+                                 :style="{ height: point.height + '%' }"
+                                 :class="point.score > 0 ? 'bg-emerald-500' : point.score < 0 ? 'bg-amber-500' : 'bg-blue-500'"
+                                 :title="point.name + ': ' + point.score + '%'">
+                            </div>
+                            <span class="text-[8px] text-zinc-600 leading-none h-3">{{ point.label }}</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="bg-[#0F1115] border border-[#22242D] rounded-xl p-3 text-center">
+                            <div class="text-lg font-black text-white">{{ reportStats.average }}%</div>
+                            <div class="text-[9px] text-zinc-500 uppercase font-bold mt-1">среднее</div>
+                        </div>
+                        <div class="bg-[#0F1115] border border-[#22242D] rounded-xl p-3 text-center">
+                            <div class="text-lg font-black text-white">{{ reportStats.best }}%</div>
+                            <div class="text-[9px] text-zinc-500 uppercase font-bold mt-1">лучшее</div>
+                        </div>
+                        <div class="bg-[#0F1115] border border-[#22242D] rounded-xl p-3 text-center">
+                            <div class="text-lg font-black text-white">{{ reportStats.trend }}</div>
+                            <div class="text-[9px] text-zinc-500 uppercase font-bold mt-1">тренд</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-[#16171D] border border-[#22242D] rounded-2xl p-5 space-y-4">
+                    <div>
+                        <h3 class="text-sm font-black text-white">Прогресс нагрузки</h3>
+                        <p class="text-[10px] text-zinc-500 mt-1">Фактический объем по тренировкам с учетом прогрессии и периодизации</p>
+                    </div>
+
+                    <div class="h-40 bg-[#0F1115] border border-[#22242D] rounded-xl p-3 flex items-end gap-1.5">
+                        <div v-for="point in reportVolumeChartPoints" :key="point.id" class="flex-1 h-full flex flex-col justify-end items-center gap-1">
+                            <div class="w-full min-w-[6px] rounded-t bg-indigo-500 transition-all"
+                                 :style="{ height: point.height + '%' }"
+                                 :title="point.name + ': ' + point.volume">
+                            </div>
+                            <span class="text-[8px] text-zinc-600 leading-none h-3">{{ point.label }}</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="bg-[#0F1115] border border-[#22242D] rounded-xl p-3 text-center">
+                            <div class="text-lg font-black text-white">{{ reportVolumeStats.average }}</div>
+                            <div class="text-[9px] text-zinc-500 uppercase font-bold mt-1">средний</div>
+                        </div>
+                        <div class="bg-[#0F1115] border border-[#22242D] rounded-xl p-3 text-center">
+                            <div class="text-lg font-black text-white">{{ reportVolumeStats.best }}</div>
+                            <div class="text-[9px] text-zinc-500 uppercase font-bold mt-1">лучший</div>
+                        </div>
+                        <div class="bg-[#0F1115] border border-[#22242D] rounded-xl p-3 text-center">
+                            <div class="text-lg font-black text-white">{{ reportVolumeStats.trend }}</div>
+                            <div class="text-[9px] text-zinc-500 uppercase font-bold mt-1">тренд</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button @click="reportSubScreen = 'history'"
+                        class="w-full bg-[#16171D] hover:bg-[#1C1E26] border border-[#22242D] text-zinc-200 font-semibold py-4 px-6 rounded-xl flex items-center justify-between transition-all active:scale-[0.99]">
+                    <span class="text-base flex items-center">
+                        <i class="ri-history-line mr-2 text-lg text-blue-500"></i> История тренировок
+                    </span>
+                    <i class="ri-arrow-right-s-line text-zinc-500 text-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <div v-if="reportSubScreen === 'history'">
+            <div class="flex items-center space-x-2 mb-6">
+                <button @click="reportSubScreen = 'summary'" class="text-zinc-400 hover:text-white text-sm flex items-center">
+                    <i class="ri-arrow-left-line mr-1"></i> К отчёту
+                </button>
                 <h2 class="text-xl font-bold tracking-tight text-white">История тренировок</h2>
             </div>
 
@@ -374,6 +563,13 @@
                             <h3 class="font-extrabold text-base text-white capitalize leading-tight">{{ w.name }}</h3>
                             <p class="text-[10px] text-zinc-500 mt-2 flex items-center">
                                 <i class="ri-calendar-line text-zinc-500 mr-1.5"></i> {{ formatDate(w.date) }}
+                            </p>
+                            <p v-if="w.trainingProgram" class="text-[10px] text-blue-400 mt-1 flex items-center">
+                                <i class="ri-folder-shield-2-line mr-1.5"></i>
+                                {{ w.trainingProgram.name }} • неделя {{ w.weekNumber || 1 }}
+                            </p>
+                            <p v-else class="text-[10px] text-zinc-600 mt-1 flex items-center">
+                                <i class="ri-draft-line mr-1.5"></i> Без программы
                             </p>
                         </div>
                         <span class="text-xs bg-[#22242D] text-zinc-300 px-2.5 py-1 rounded-md font-bold shrink-0 flex items-center">
@@ -663,10 +859,91 @@
         </div>
     </transition>
 
+    <transition name="slide-up">
+        <div v-if="completionSummary" class="fixed inset-0 bg-black/70 z-50 flex items-end justify-center" @click.self="closeCompletionSummary">
+            <div class="bg-[#16171D] border-t border-[#22242D] rounded-t-3xl w-full max-w-md p-6 space-y-5 shadow-2xl">
+                <div class="w-12 h-1 bg-zinc-700 rounded-full mx-auto"></div>
+                <div>
+                    <span class="text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2.5 py-1 rounded-md uppercase font-bold tracking-wider">
+                        Тренировка завершена
+                    </span>
+                    <h3 class="text-xl font-black text-white mt-3">{{ completionSummary.title }}</h3>
+                    <p class="text-sm mt-2" :class="completionSummary.scoreDelta >= 0 ? 'text-emerald-400' : 'text-amber-400'">
+                        {{ completionSummary.message }}
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="bg-[#0F1115] border border-[#22242D] rounded-xl p-3 text-center">
+                        <div class="text-lg font-black text-white">{{ completionSummary.completedSets }}</div>
+                        <div class="text-[9px] text-zinc-500 uppercase font-bold mt-1">подходов</div>
+                    </div>
+                    <div class="bg-[#0F1115] border border-[#22242D] rounded-xl p-3 text-center">
+                        <div class="text-lg font-black text-white">{{ completionSummary.totalVolume }}</div>
+                        <div class="text-[9px] text-zinc-500 uppercase font-bold mt-1">объем</div>
+                    </div>
+                    <div class="bg-[#0F1115] border border-[#22242D] rounded-xl p-3 text-center">
+                        <div class="text-lg font-black text-white">{{ completionSummary.duration }}</div>
+                        <div class="text-[9px] text-zinc-500 uppercase font-bold mt-1">время</div>
+                    </div>
+                </div>
+
+                <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    <div v-for="item in completionSummary.exercises" :key="item.name" class="bg-[#0F1115] border border-[#22242D] rounded-xl p-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-bold text-white capitalize truncate">{{ item.name }}</span>
+                            <span class="text-[10px] font-bold" :class="item.delta >= 0 ? 'text-emerald-400' : 'text-amber-400'">
+                                {{ item.delta >= 0 ? '+' : '' }}{{ item.delta }}%
+                            </span>
+                        </div>
+                        <div class="text-[10px] text-zinc-500 mt-1">
+                            План: {{ item.planned }} • Факт: {{ item.actual }}
+                            <span v-if="item.extraSets > 0" class="text-emerald-400"> • +{{ item.extraSets }} доп.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button @click="closeCompletionSummary"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 rounded-xl transition-all active:scale-[0.99]">
+                    ГОТОВО
+                </button>
+            </div>
+        </div>
+    </transition>
+
+    <transition name="slide-up">
+        <div v-if="incompleteWorkoutWarning" class="fixed inset-0 bg-black/70 z-50 flex items-end justify-center" @click.self="incompleteWorkoutWarning = null">
+            <div class="bg-[#16171D] border-t border-[#22242D] rounded-t-3xl w-full max-w-md p-6 space-y-5 shadow-2xl">
+                <div class="w-12 h-1 bg-zinc-700 rounded-full mx-auto"></div>
+                <div>
+                    <span class="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2.5 py-1 rounded-md uppercase font-bold tracking-wider">
+                        Не все подходы выполнены
+                    </span>
+                    <h3 class="text-xl font-black text-white mt-3">Тренировку пока нельзя завершить</h3>
+                    <p class="text-sm text-zinc-400 mt-2">
+                        Чтобы программа корректно засчитала день и пересчитала веса, отметь все подходы.
+                    </p>
+                </div>
+
+                <div class="space-y-2 max-h-44 overflow-y-auto pr-1">
+                    <div v-for="item in incompleteWorkoutWarning" :key="item.name" class="bg-[#0F1115] border border-[#22242D] rounded-xl p-3 flex items-center justify-between">
+                        <span class="text-sm font-bold text-white capitalize truncate">{{ item.name }}</span>
+                        <span class="text-[10px] text-amber-400 font-bold shrink-0">{{ item.incompleteSets }} подх.</span>
+                    </div>
+                </div>
+
+                <button @click="incompleteWorkoutWarning = null"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 rounded-xl transition-all active:scale-[0.99]">
+                    ВЕРНУТЬСЯ К ТРЕНИРОВКЕ
+                </button>
+            </div>
+        </div>
+    </transition>
+
 </div>
 
 <script>
-    const { createApp, ref, computed, onMounted } = Vue;
+    const { createApp, ref, computed, onMounted, watch } = Vue;
 
     createApp({
         setup() {
@@ -694,9 +971,12 @@
 
             const workoutDuration = ref(0);
             let timerInterval = null;
+            let isRestoringWorkoutDraft = false;
 
             const workoutHistory = ref([]);
             const loadingHistory = ref(false);
+            const reportSubScreen = ref('summary');
+            const reportProgramFilter = ref('all');
 
             const friends = ref([]);
             const pendingRequests = ref([]);
@@ -713,6 +993,9 @@
             const newProgramType = ref("LINEAR");
             const newTemplateName = ref("");
             const selectedExerciseIds = ref([]);
+            const editingProgram = ref(null);
+            const editingProgramName = ref("");
+            const editingTemplates = ref([]);
 
             const isAddingDayOnly = ref(false);
             const selectedProgramId = ref(null);
@@ -723,6 +1006,8 @@
 
             const isInfoOpen = ref(false);
             const selectedExercise = ref(null);
+            const completionSummary = ref(null);
+            const incompleteWorkoutWarning = ref(null);
 
             const searchQuery = ref("");
             const filterCategory = ref("");
@@ -730,6 +1015,9 @@
 
             // Динамически подгружаемый список дефолтных шаблонов (инициализируется пустым)
             const predefinedTemplates = ref([]);
+
+            const workoutDraftMaxAgeMs = 12 * 60 * 60 * 1000;
+            const workoutDraftKey = () => `gymtracker_active_workout_${telegramId.value}`;
 
             onMounted(() => {
                 if (tg) {
@@ -745,7 +1033,77 @@
                 fetchAllExercises();
                 fetchAchievementsCatalog();
                 loadPredefinedTemplates(); // Загружаем при первом старте
+                restoreActiveWorkoutDraft();
+                window.addEventListener('pagehide', saveActiveWorkoutDraft);
+                window.addEventListener('beforeunload', saveActiveWorkoutDraft);
             });
+
+            const startWorkoutTimer = () => {
+                if (timerInterval) clearInterval(timerInterval);
+                timerInterval = setInterval(() => {
+                    workoutDuration.value++;
+                    saveActiveWorkoutDraft();
+                }, 1000);
+            };
+
+            const saveActiveWorkoutDraft = () => {
+                if (isRestoringWorkoutDraft || workoutSubScreen.value !== 'active_workout' || activeExercises.value.length === 0) {
+                    return;
+                }
+
+                const draft = {
+                    version: 1,
+                    savedAt: Date.now(),
+                    workoutName: workoutName.value,
+                    workoutDuration: workoutDuration.value,
+                    selectedProgramId: selectedProgramId.value,
+                    activeProgram: activeProgram.value,
+                    activeTemplate: activeTemplate.value,
+                    previewExercises: previewExercises.value,
+                    activeExercises: activeExercises.value
+                };
+
+                localStorage.setItem(workoutDraftKey(), JSON.stringify(draft));
+            };
+
+            const restoreActiveWorkoutDraft = () => {
+                const rawDraft = localStorage.getItem(workoutDraftKey());
+                if (!rawDraft) return;
+
+                try {
+                    const draft = JSON.parse(rawDraft);
+                    const savedAt = draft.savedAt || Date.now();
+                    const ageMs = Date.now() - savedAt;
+
+                    if (ageMs > workoutDraftMaxAgeMs || !Array.isArray(draft.activeExercises) || draft.activeExercises.length === 0) {
+                        clearActiveWorkoutDraft();
+                        return;
+                    }
+
+                    isRestoringWorkoutDraft = true;
+                    workoutName.value = draft.workoutName || "Тренировка";
+                    selectedProgramId.value = draft.selectedProgramId || null;
+                    activeProgram.value = draft.activeProgram || null;
+                    activeTemplate.value = draft.activeTemplate || null;
+                    previewExercises.value = draft.previewExercises || [];
+                    activeExercises.value = draft.activeExercises;
+                    workoutDuration.value = (draft.workoutDuration || 0) + Math.floor(Math.max(0, ageMs) / 1000);
+                    activeTab.value = 'workouts';
+                    workoutSubScreen.value = 'active_workout';
+                    startWorkoutTimer();
+                } catch (error) {
+                    console.error("Не удалось восстановить тренировку:", error);
+                    clearActiveWorkoutDraft();
+                } finally {
+                    isRestoringWorkoutDraft = false;
+                }
+            };
+
+            const clearActiveWorkoutDraft = () => {
+                localStorage.removeItem(workoutDraftKey());
+            };
+
+            watch(activeExercises, saveActiveWorkoutDraft, { deep: true });
 
             // Метод генерации инициалов (для круглых иконок)
             const getInitials = (name) => {
@@ -776,6 +1134,127 @@
                 const totalSeconds = workoutHistory.value.reduce((acc, w) => acc + (w.durationInSeconds || 0), 0);
                 return Math.floor(totalSeconds / 60);
             });
+
+            const reportProgramOptions = computed(() => {
+                const programs = new Map();
+                workoutHistory.value.forEach(w => {
+                    if (w.trainingProgram) {
+                        programs.set(w.trainingProgram.id, {
+                            id: w.trainingProgram.id,
+                            name: w.trainingProgram.name
+                        });
+                    }
+                });
+                return Array.from(programs.values());
+            });
+
+            const reportWorkouts = computed(() => {
+                return workoutHistory.value
+                    .filter(w => {
+                        if (reportProgramFilter.value === 'all') return true;
+                        if (reportProgramFilter.value === 'none') return !w.trainingProgram;
+                        return w.trainingProgram && String(w.trainingProgram.id) === reportProgramFilter.value;
+                    })
+                    .slice()
+                    .reverse();
+            });
+
+            const reportChartPoints = computed(() => {
+                const recent = reportWorkouts.value.slice(-14);
+                return recent.map((w, index) => {
+                    const score = w.qualityScorePercent ?? 0;
+                    return {
+                        id: w.id,
+                        name: w.name,
+                        score,
+                        label: getChartPointLabel(w, index, recent.length),
+                        height: Math.max(8, Math.min(100, 50 + score * 2))
+                    };
+                });
+            });
+
+            const reportStats = computed(() => {
+                const scores = reportWorkouts.value.map(w => w.qualityScorePercent ?? 0);
+                if (scores.length === 0) {
+                    return { average: 0, best: 0, trend: "нет" };
+                }
+
+                const average = Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
+                const best = Math.max(...scores);
+                const firstHalf = scores.slice(0, Math.max(1, Math.floor(scores.length / 2)));
+                const secondHalf = scores.slice(Math.max(1, Math.floor(scores.length / 2)));
+                const firstAverage = firstHalf.reduce((sum, score) => sum + score, 0) / firstHalf.length;
+                const secondAverage = secondHalf.length > 0
+                    ? secondHalf.reduce((sum, score) => sum + score, 0) / secondHalf.length
+                    : firstAverage;
+
+                let trend = "ровно";
+                if (secondAverage - firstAverage >= 3) trend = "вверх";
+                if (firstAverage - secondAverage >= 3) trend = "вниз";
+
+                return { average, best, trend };
+            });
+
+            const reportVolumeChartPoints = computed(() => {
+                const recent = reportWorkouts.value.slice(-14);
+                const volumes = recent.map(getWorkoutActualVolume);
+                const maxVolume = Math.max(...volumes, 1);
+
+                return recent.map((w, index) => {
+                    const volume = volumes[index];
+                    return {
+                        id: w.id,
+                        name: w.name,
+                        volume: formatScore(volume),
+                        label: getChartPointLabel(w, index, recent.length),
+                        height: Math.max(8, Math.round((volume / maxVolume) * 100))
+                    };
+                });
+            });
+
+            const reportVolumeStats = computed(() => {
+                const volumes = reportWorkouts.value.map(getWorkoutActualVolume);
+                if (volumes.length === 0) {
+                    return { average: 0, best: 0, trend: "нет" };
+                }
+
+                const average = Math.round(volumes.reduce((sum, volume) => sum + volume, 0) / volumes.length);
+                const best = Math.round(Math.max(...volumes));
+                const firstHalf = volumes.slice(0, Math.max(1, Math.floor(volumes.length / 2)));
+                const secondHalf = volumes.slice(Math.max(1, Math.floor(volumes.length / 2)));
+                const firstAverage = firstHalf.reduce((sum, volume) => sum + volume, 0) / firstHalf.length;
+                const secondAverage = secondHalf.length > 0
+                    ? secondHalf.reduce((sum, volume) => sum + volume, 0) / secondHalf.length
+                    : firstAverage;
+
+                let trend = "ровно";
+                if (secondAverage > firstAverage * 1.05) trend = "вверх";
+                if (secondAverage < firstAverage * 0.95) trend = "вниз";
+
+                return { average, best, trend };
+            });
+
+            const getWorkoutActualVolume = (workout) => {
+                if (workout.actualVolume !== null && workout.actualVolume !== undefined) {
+                    return Number(workout.actualVolume || 0);
+                }
+
+                if (!workout.workoutSets) return 0;
+                return workout.workoutSets.reduce((sum, set) => {
+                    const type = set.exercise?.type;
+                    if (type === 'BODYWEIGHT') {
+                        return sum + Number(set.reps || 0);
+                    }
+                    return sum + Number(set.weight || 0) * Number(set.reps || 0);
+                }, 0);
+            };
+
+            const getChartPointLabel = (workout, index, total) => {
+                if (total <= 6 || index === 0 || index === total - 1 || index % 4 === 0) {
+                    return formatShortDate(workout.date);
+                }
+                return "";
+            };
 
             const uniqueCategories = computed(() => {
                 const cats = allExercises.value.map(ex => ex.category).filter(Boolean);
@@ -862,13 +1341,45 @@
                 workoutSubScreen.value = 'templates';
                 loadCustomPrograms();
                 loadPredefinedTemplates(); // Загружаем при открытии экрана
+                loadHistoryData();
+            };
+
+            const getTemplateStatus = (program, template, templateIndex) => {
+                if (!program || !program.user || !program.templates) return 'available';
+
+                const currentWeek = program.currentWeek || 1;
+                const completedNames = new Set(
+                    workoutHistory.value
+                        .filter(w => w.trainingProgram && w.trainingProgram.id === program.id && (w.weekNumber || 1) === currentWeek)
+                        .map(w => w.name)
+                );
+
+                if (completedNames.has(template.name)) {
+                    return 'done';
+                }
+
+                const firstAvailableIndex = program.templates.findIndex(t => !completedNames.has(t.name));
+                return templateIndex === firstAvailableIndex ? 'next' : 'upcoming';
+            };
+
+            const openProgramTemplate = (program, template, templateIndex) => {
+                const status = getTemplateStatus(program, template, templateIndex);
+                if (status === 'done') {
+                    alert("Эта тренировка уже выполнена на текущей неделе. Выбери день, который подсвечен как следующий.");
+                    return;
+                }
+
+                openWorkoutPreview(program, template);
             };
 
             const switchTab = (tab) => {
                 activeTab.value = tab;
                 if (tab === 'workouts') {
-                    workoutSubScreen.value = 'menu';
+                    if (workoutSubScreen.value !== 'active_workout') {
+                        workoutSubScreen.value = 'menu';
+                    }
                 } else if (tab === 'history') {
+                    reportSubScreen.value = 'summary';
                     loadHistoryData();
                 } else if (tab === 'profile') {
                     loadHistoryData();
@@ -1038,7 +1549,10 @@
                 activeTemplate.value = template;
 
 
-                previewExercises.value = template.templates ? template.templates.map(t => t.exercise) : [];
+                previewExercises.value = template.templates ? template.templates.map(t => ({
+                    ...t.exercise,
+                    targetSets: t.targetSets || 3
+                })) : [];
 
                 workoutSubScreen.value = 'preview';
             };
@@ -1075,6 +1589,90 @@
                 } catch (error) {
                     console.error("Ошибка удаления:", error);
                     alert("Не удалось удалить программу!");
+                }
+            };
+
+            const openProgramEditor = (program) => {
+                editingProgram.value = program;
+                editingProgramName.value = program.name;
+                editingTemplates.value = (program.templates || []).map(template => ({
+                    id: template.id,
+                    name: template.name,
+                    exerciseToAdd: null,
+                    items: (template.templates || []).map(item => ({
+                        localId: `${template.id}-${item.exercise.id}-${item.sequenceOrder}`,
+                        exercise: item.exercise,
+                        targetSets: item.targetSets || 3
+                    }))
+                }));
+                workoutSubScreen.value = 'edit_program';
+            };
+
+            const saveProgramName = async () => {
+                try {
+                    await axios.put(`/api/workouts/programs/${editingProgram.value.id}`, {
+                        telegramId: telegramId.value,
+                        name: editingProgramName.value
+                    });
+                    await loadCustomPrograms();
+                    const updated = customPrograms.value.find(p => p.id === editingProgram.value.id);
+                    if (updated) openProgramEditor(updated);
+                } catch (error) {
+                    console.error("Ошибка сохранения программы:", error);
+                    alert("Не удалось сохранить название программы.");
+                }
+            };
+
+            const addExerciseToEditingTemplate = (template) => {
+                if (!template.exerciseToAdd) return;
+                const exercise = allExercises.value.find(ex => ex.id === template.exerciseToAdd);
+                if (!exercise) return;
+
+                template.items.push({
+                    localId: `new-${Date.now()}-${exercise.id}`,
+                    exercise,
+                    targetSets: 3
+                });
+                template.exerciseToAdd = null;
+            };
+
+            const removeExerciseFromEditingTemplate = (template, localId) => {
+                template.items = template.items.filter(item => item.localId !== localId);
+            };
+
+            const saveEditingTemplate = async (template) => {
+                try {
+                    await axios.put(`/api/workouts/templates/${template.id}`, {
+                        telegramId: telegramId.value,
+                        name: template.name,
+                        exercises: template.items.map(item => ({
+                            exerciseId: item.exercise.id,
+                            targetSets: item.targetSets || 1
+                        }))
+                    });
+                    await loadCustomPrograms();
+                    const updated = customPrograms.value.find(p => p.id === editingProgram.value.id);
+                    if (updated) openProgramEditor(updated);
+                } catch (error) {
+                    console.error("Ошибка сохранения дня:", error);
+                    alert("Не удалось сохранить тренировочный день.");
+                }
+            };
+
+            const deleteEditingTemplate = async (template) => {
+                if (!confirm(`Удалить тренировочный день "${template.name}"?`)) return;
+
+                try {
+                    await axios.delete(`/api/workouts/templates/${template.id}`, {
+                        params: { telegramId: telegramId.value }
+                    });
+                    await loadCustomPrograms();
+                    const updated = customPrograms.value.find(p => p.id === editingProgram.value.id);
+                    if (updated) openProgramEditor(updated);
+                    else workoutSubScreen.value = 'templates';
+                } catch (error) {
+                    console.error("Ошибка удаления дня:", error);
+                    alert("Не удалось удалить тренировочный день.");
                 }
             };
 
@@ -1169,20 +1767,32 @@
 
                 activeExercises.value = exerciseList.map(ex => {
                     const prevSets = latestSetsMap[ex.id];
+                    const targetSetCount = ex.targetSets || (prevSets ? prevSets.length : 3);
                     let sets = [];
 
                     if (prevSets && prevSets.length > 0) {
-                        sets = prevSets.map(p => ({
-                            weight: p.weight,
-                            reps: p.reps,
+                        const fallbackSet = prevSets[prevSets.length - 1];
+                        sets = Array.from({ length: targetSetCount }, (_, index) => {
+                            const p = prevSets[index] || fallbackSet;
+                            return {
+                                weight: p.weight,
+                                reps: p.reps,
+                                targetWeight: p.weight,
+                                targetReps: p.reps,
+                                isExtra: false,
+                                completed: false
+                            };
+                        });
+                    } else {
+                        const defaultWeight = ex.type === 'BODYWEIGHT' ? 0 : 60;
+                        sets = Array.from({ length: targetSetCount }, () => ({
+                            weight: defaultWeight,
+                            reps: 10,
+                            targetWeight: defaultWeight,
+                            targetReps: 10,
+                            isExtra: false,
                             completed: false
                         }));
-                    } else {
-                        sets = [
-                            { weight: ex.type === 'BODYWEIGHT' ? 0 : 60, reps: 10, completed: false },
-                            { weight: ex.type === 'BODYWEIGHT' ? 0 : 60, reps: 10, completed: false },
-                            { weight: ex.type === 'BODYWEIGHT' ? 0 : 60, reps: 10, completed: false }
-                        ];
                     }
 
                     return {
@@ -1192,10 +1802,8 @@
                 });
 
                 workoutDuration.value = 0;
-                if (timerInterval) clearInterval(timerInterval);
-                timerInterval = setInterval(() => {
-                    workoutDuration.value++;
-                }, 1000);
+                startWorkoutTimer();
+                saveActiveWorkoutDraft();
             };
 
             const openExerciseInfo = (exercise) => {
@@ -1209,6 +1817,9 @@
                 sets.push({
                     weight: lastSet ? lastSet.weight : 60,
                     reps: lastSet ? lastSet.reps : 10,
+                    targetWeight: 0,
+                    targetReps: 0,
+                    isExtra: true,
                     completed: false
                 });
             };
@@ -1217,12 +1828,106 @@
                 activeExercises.value[exIndex].sets[setIndex].completed = !activeExercises.value[exIndex].sets[setIndex].completed;
             };
 
+            const calculateWorkoutSummary = () => {
+                const exercises = activeExercises.value.map(ex => {
+                    const completedSets = ex.sets.filter(set => set.completed);
+                    const plannedSets = ex.sets.filter(set => !set.isExtra);
+                    const actual = completedSets.reduce((sum, set) => sum + calculateSetScore(ex, set.weight, set.reps), 0);
+                    const planned = plannedSets.reduce((sum, set) => sum + calculateSetScore(ex, set.targetWeight ?? set.weight, set.targetReps ?? set.reps), 0);
+                    const delta = planned > 0 ? Math.round(((actual - planned) / planned) * 100) : 0;
+                    const extraSets = completedSets.filter(set => set.isExtra).length;
+
+                    return {
+                        name: ex.name,
+                        planned: formatScore(planned),
+                        actual: formatScore(actual),
+                        delta,
+                        extraSets
+                    };
+                }).filter(item => item.planned !== '0');
+
+                const completedSets = activeExercises.value.reduce((sum, ex) => sum + ex.sets.filter(set => set.completed).length, 0);
+                const additionalSets = activeExercises.value.reduce((sum, ex) => sum + ex.sets.filter(set => set.completed && set.isExtra).length, 0);
+                const actualTotal = activeExercises.value.reduce((sum, ex) => {
+                    return sum + ex.sets
+                        .filter(set => set.completed)
+                        .reduce((setSum, set) => setSum + calculateSetScore(ex, set.weight, set.reps), 0);
+                }, 0);
+                const plannedTotal = activeExercises.value.reduce((sum, ex) => {
+                    return sum + ex.sets
+                        .filter(set => !set.isExtra)
+                        .reduce((setSum, set) => setSum + calculateSetScore(ex, set.targetWeight ?? set.weight, set.targetReps ?? set.reps), 0);
+                }, 0);
+                const scoreDelta = plannedTotal > 0 ? Math.round(((actualTotal - plannedTotal) / plannedTotal) * 100) : 0;
+
+                return {
+                    title: workoutName.value,
+                    completedSets,
+                    totalVolume: formatScore(actualTotal),
+                    duration: formatDurationMinutes(workoutDuration.value),
+                    scoreDelta,
+                    plannedVolume: plannedTotal,
+                    actualVolume: actualTotal,
+                    additionalSets,
+                    message: getCompletionMessage(scoreDelta, additionalSets),
+                    exercises
+                };
+            };
+
+            const calculateSetScore = (exercise, weight, reps) => {
+                if (exercise.type === 'BODYWEIGHT') {
+                    return Number(reps || 0);
+                }
+                return Number(weight || 0) * Number(reps || 0);
+            };
+
+            const formatScore = (score) => {
+                return Number.isInteger(score) ? String(score) : score.toFixed(1);
+            };
+
+            const getCompletionMessage = (delta, additionalSets = 0) => {
+                if (additionalSets > 0 && delta > 0) return `План выполнен + дополнительная работа: +${delta}%.`;
+                if (delta >= 10) return `Сильнее плана на ${delta}%. Отличная тренировка.`;
+                if (delta > 0) return `Чуть выше плана: +${delta}%.`;
+                if (delta === 0) return "План выполнен ровно. Отличная дисциплина.";
+                if (delta >= -10) return `Почти план: ${delta}%. Нормальный рабочий день.`;
+                return `Ниже плана на ${Math.abs(delta)}%. Возможно, стоит восстановиться.`;
+            };
+
+            const getIncompleteExercises = () => {
+                return activeExercises.value
+                    .map(ex => {
+                        const incompleteSets = ex.sets.filter(set => !set.completed && !set.isExtra).length;
+                        return {
+                            name: ex.name,
+                            incompleteSets
+                        };
+                    })
+                    .filter(item => item.incompleteSets > 0);
+            };
+
+            const closeCompletionSummary = () => {
+                completionSummary.value = null;
+                switchTab('workouts');
+            };
+
             const finishWorkout = async () => {
+                const incompleteExercises = getIncompleteExercises();
+                if (incompleteExercises.length > 0) {
+                    incompleteWorkoutWarning.value = incompleteExercises;
+                    return;
+                }
+
+                const summary = calculateWorkoutSummary();
+
                 const payload = {
                     telegramId: telegramId.value,
                     workoutName: workoutName.value,
                     durationInSeconds: workoutDuration.value,
                     programId: selectedProgramId.value,
+                    qualityScorePercent: summary.scoreDelta,
+                    plannedVolume: summary.plannedVolume,
+                    actualVolume: summary.actualVolume,
                     sets: []
                 };
 
@@ -1233,14 +1938,15 @@
                                 exerciseId: ex.id,
                                 setNumber: index + 1,
                                 weight: set.weight,
-                                reps: set.reps
+                                reps: set.reps,
+                                extraSet: Boolean(set.isExtra)
                             });
                         }
                     });
                 });
 
                 if (payload.sets.length === 0) {
-                    alert("Отметь галочкой хотя бы один выполненный подход!");
+                    incompleteWorkoutWarning.value = getIncompleteExercises();
                     return;
                 }
 
@@ -1248,9 +1954,13 @@
                     await axios.post('/api/workouts', payload);
                     await loadEarnedAchievements();
                     await loadHistoryData();
-                    alert(`Тренировка записана! Время: ${formattedDuration.value}`);
+                    completionSummary.value = summary;
                     if (timerInterval) clearInterval(timerInterval);
-                    switchTab('workouts');
+                    clearActiveWorkoutDraft();
+                    activeExercises.value = [];
+                    workoutDuration.value = 0;
+                    selectedProgramId.value = null;
+                    workoutSubScreen.value = 'menu';
                 } catch (error) {
                     console.error("Ошибка сохранения:", error);
                     alert("Ошибка!");
@@ -1266,6 +1976,15 @@
                     month: 'long',
                     hour: '2-digit',
                     minute: '2-digit'
+                });
+            };
+
+            const formatShortDate = (dateStr) => {
+                if (!dateStr) return "";
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('ru-RU', {
+                    day: '2-digit',
+                    month: '2-digit'
                 });
             };
 
@@ -1312,10 +2031,15 @@
                 newProgramType,
                 newTemplateName,
                 selectedExerciseIds,
+                editingProgram,
+                editingProgramName,
+                editingTemplates,
                 formattedDuration,
                 isAddingDayOnly,
                 isInfoOpen,
                 selectedExercise,
+                completionSummary,
+                incompleteWorkoutWarning,
                 searchQuery,
                 filterCategory,
                 filterEquipment,
@@ -1323,6 +2047,13 @@
                 uniqueEquipments,
                 workoutHistory,
                 loadingHistory,
+                reportSubScreen,
+                reportProgramFilter,
+                reportProgramOptions,
+                reportChartPoints,
+                reportStats,
+                reportVolumeChartPoints,
+                reportVolumeStats,
                 friends,
                 loadingFriends,
                 selectedFriendProfile,
@@ -1333,13 +2064,22 @@
                 pendingRequests,
                 translateCategory,
                 openTemplatesScreen,
+                getTemplateStatus,
+                openProgramTemplate,
                 openConstructor,
+                openProgramEditor,
+                saveProgramName,
+                addExerciseToEditingTemplate,
+                removeExerciseFromEditingTemplate,
+                saveEditingTemplate,
+                deleteEditingTemplate,
                 saveCustomProgram,
                 startCustomWorkout,
                 startTemplateWorkout,
                 addSet,
                 toggleSet,
                 finishWorkout,
+                closeCompletionSummary,
                 deleteProgram,
                 openAddDayOnly,
                 openExerciseInfo,

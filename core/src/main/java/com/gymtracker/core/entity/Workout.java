@@ -28,6 +28,12 @@ public class Workout {
     // Длительность тренировки
     private Integer durationInSeconds;
 
+    private Integer qualityScorePercent;
+
+    private Double plannedVolume;
+
+    private Double actualVolume;
+
     @ManyToOne
     private TrainingProgram trainingProgram;
 

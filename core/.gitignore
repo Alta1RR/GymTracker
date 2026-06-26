@@ -35,3 +35,6 @@ build/
 ### Application Configuration ###
 **/application.properties
 **/application.yml
+.env
+.env.*
+!.env.example

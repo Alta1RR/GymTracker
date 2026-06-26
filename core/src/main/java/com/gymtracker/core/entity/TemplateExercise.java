@@ -15,6 +15,8 @@ public class TemplateExercise {
 
     private Integer sequenceOrder;
 
+    private Integer targetSets = 3;
+
     @JsonIgnore
     @ManyToOne
     private WorkoutTemplate workoutTemplate;
