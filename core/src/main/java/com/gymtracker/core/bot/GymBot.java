@@ -71,6 +71,22 @@ public class GymBot extends TelegramLongPollingBot {
                     }
                 }
 
+                if (messageText.contains("program_")) {
+                    try {
+                        String programIdStr = messageText.substring(messageText.indexOf("program_") + 8).trim();
+                        Long programId = Long.parseLong(programIdStr);
+
+                        workoutService.copySharedProgram(programId, chatId);
+
+                        sendTextMessage(chatId, "Программа добавлена в твой GymTracker. Открой Web App и начинай тренироваться.");
+                        return;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        sendTextMessage(chatId, "Не получилось добавить программу по ссылке. Попроси отправить ссылку еще раз.");
+                        return;
+                    }
+                }
+
                 if (isNewUser) {
                     sendTextMessage(chatId, "Привет! Твой профиль в GymTracker успешно создан. Нажми кнопку 'Зал' внизу, чтобы начать тренироваться!");
                 } else {

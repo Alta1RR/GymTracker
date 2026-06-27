@@ -222,6 +222,50 @@ public class WorkoutService {
         trainingProgramRepository.delete(trainingProgram);
     }
 
+    @Transactional
+    public TrainingProgram copySharedProgram(Long sourceProgramId, Long telegramId) {
+        AppUser user = appUserRepository.findByTelegramId(telegramId)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+
+        TrainingProgram source = trainingProgramRepository.findById(sourceProgramId)
+                .orElseThrow(() -> new RuntimeException("Программа не найдена"));
+
+        if (source.getUser() != null && source.getUser().getTelegramId().equals(telegramId)) {
+            return source;
+        }
+
+        Optional<TrainingProgram> existing = trainingProgramRepository.findByUserAndName(user, source.getName());
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+
+        TrainingProgram clone = new TrainingProgram();
+        clone.setUser(user);
+        clone.setName(source.getName());
+        clone.setProgressionType(source.getProgressionType());
+        clone.setCurrentWeek(1);
+        TrainingProgram savedClone = trainingProgramRepository.save(clone);
+
+        for (WorkoutTemplate sourceTemplate : source.getTemplates()) {
+            WorkoutTemplate templateClone = new WorkoutTemplate();
+            templateClone.setName(sourceTemplate.getName());
+            templateClone.setTrainingProgram(savedClone);
+            WorkoutTemplate savedTemplateClone = workoutTemplateRepository.save(templateClone);
+
+            int order = 1;
+            for (TemplateExercise sourceExercise : sourceTemplate.getTemplates()) {
+                TemplateExercise exerciseClone = new TemplateExercise();
+                exerciseClone.setWorkoutTemplate(savedTemplateClone);
+                exerciseClone.setExercise(sourceExercise.getExercise());
+                exerciseClone.setSequenceOrder(order++);
+                exerciseClone.setTargetSets(sourceExercise.getTargetSets());
+                templateExerciseRepository.save(exerciseClone);
+            }
+        }
+
+        return trainingProgramRepository.findById(savedClone.getId()).orElse(savedClone);
+    }
+
     public List<WorkoutSetDto> getLatestWorkoutSets(Long telegramId, String workoutName) {
         AppUser user = appUserRepository.findByTelegramId(telegramId)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
@@ -449,6 +493,7 @@ public class WorkoutService {
                 exerciseClone.setWorkoutTemplate(savedTemplateClone);
                 exerciseClone.setExercise(sourceExercise.getExercise());
                 exerciseClone.setSequenceOrder(order++);
+                exerciseClone.setTargetSets(sourceExercise.getTargetSets());
                 templateExerciseRepository.save(exerciseClone);
             }
         }

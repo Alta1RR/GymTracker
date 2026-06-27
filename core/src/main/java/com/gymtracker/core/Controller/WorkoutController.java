@@ -88,6 +88,15 @@ public class WorkoutController {
         return ResponseEntity.ok("Program deleted successfully!");
     }
 
+    @PostMapping("/programs/{id}/copy")
+    public ResponseEntity<TrainingProgram> copySharedProgram(
+            @PathVariable("id") Long id,
+            @RequestParam("telegramId") Long telegramId,
+            HttpServletRequest request) {
+        assertAuthenticatedTelegramId(request, telegramId);
+        return ResponseEntity.ok(workoutService.copySharedProgram(id, telegramId));
+    }
+
     @PutMapping("/templates/{id}")
     public ResponseEntity<WorkoutTemplate> updateTemplate(
             @PathVariable("id") Long id,

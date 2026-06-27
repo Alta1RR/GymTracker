@@ -76,6 +76,9 @@
                             <i class="ri-folder-shield-2-line mr-1.5 text-blue-500"></i> {{ prog.name }}
                         </span>
                         <div class="flex items-center gap-2">
+                            <button @click="shareProgram(prog)" class="text-emerald-400 hover:text-emerald-300 transition-colors text-xs font-semibold p-1 flex items-center">
+                                <i class="ri-share-forward-line mr-1"></i> Share
+                            </button>
                             <button @click="openProgramEditor(prog)" class="text-blue-400 hover:text-blue-300 transition-colors text-xs font-semibold p-1 flex items-center">
                                 <i class="ri-edit-line mr-1"></i> Изменить
                             </button>
@@ -94,7 +97,7 @@
                                 : getTemplateStatus(prog, temp, tempIndex) === 'next'
                                     ? 'bg-blue-500/10 border-blue-500/50 shadow-lg shadow-blue-500/10'
                                     : 'bg-[#1C1E26] hover:bg-[#22242D] border-[#22242D]/60'">
-                            <div>
+                            <div class="min-w-0">
                                 <h4 class="font-bold text-sm text-white flex items-center">
                                     <i v-if="getTemplateStatus(prog, temp, tempIndex) === 'done'" class="ri-checkbox-circle-fill text-emerald-500 mr-1.5"></i>
                                     <i v-else-if="getTemplateStatus(prog, temp, tempIndex) === 'next'" class="ri-play-circle-fill text-blue-500 mr-1.5"></i>
@@ -138,7 +141,7 @@
                         <div v-for="(temp, tempIndex) in prog.templates" :key="temp.id"
                              @click="openWorkoutPreview(prog, temp)"
                              class="bg-[#1C1E26] hover:bg-[#22242D] p-4 rounded-xl border border-[#22242D]/60 cursor-pointer transition-all active:scale-[0.99] flex justify-between items-center">
-                            <div>
+                            <div class="min-w-0">
                                 <h4 class="font-bold text-sm text-white">{{ temp.name }}</h4>
                                 <p class="text-[11px] text-zinc-500 mt-0.5 flex items-center">
                                     <i class="ri-list-check-3 mr-1"></i> Упражнений: {{ temp.templates ? temp.templates.length : 0 }}
@@ -219,22 +222,22 @@
                         Найдено {{ filteredExercises.length }} совпадений (всего {{ allExercises.length }})
                     </label>
 
-                    <div class="bg-[#16171D] rounded-xl border border-[#22242D] divide-y divide-[#22242D] max-h-56 overflow-y-auto">
-                        <label v-for="ex in filteredExercises" :key="ex.id" class="flex items-center justify-between p-3.5 cursor-pointer active:bg-[#1C1E26]">
+                    <div class="bg-[#16171D] rounded-xl border border-[#22242D] divide-y divide-[#22242D] max-h-72 overflow-y-auto">
+                        <div v-for="ex in filteredExercises" :key="ex.id" @click="openExerciseInfo(ex)" class="flex items-center justify-between p-3.5 cursor-pointer active:bg-[#1C1E26]">
                             <div class="flex items-center min-w-0 pr-4">
-                                <div class="w-12 h-12 bg-[#0F1115] border border-[#22242D] rounded-xl overflow-hidden flex items-center justify-center shrink-0 mr-3">
+                                <div class="w-16 h-16 bg-[#0F1115] border border-[#22242D] rounded-xl overflow-hidden flex items-center justify-center shrink-0 mr-3">
                                     <img v-if="ex.thumbnailURL || ex.imageURL" :src="ex.thumbnailURL || ex.imageURL" class="w-full h-full object-cover" alt="Превью">
                                     <span v-else class="text-lg text-zinc-600"><i class="ri-image-line"></i></span>
                                 </div>
                                 <div class="flex flex-col min-w-0">
-                                    <span class="text-sm font-bold leading-tight truncate">{{ ex.name }}</span>
+                                    <span class="text-sm font-bold leading-tight line-clamp-2 capitalize">{{ ex.name }}</span>
                                     <span class="text-[10px] text-zinc-500 mt-1 capitalize truncate">
                                         {{ translateCategory(ex.category) }} • {{ ex.equipment }}
                                     </span>
                                 </div>
                             </div>
-                            <input type="checkbox" :value="ex.id" v-model="selectedExerciseIds" class="w-5 h-5 rounded border-[#22242D] bg-[#0F1115] text-blue-500 focus:ring-blue-500">
-                        </label>
+                            <input @click.stop type="checkbox" :value="ex.id" v-model="selectedExerciseIds" class="w-5 h-5 rounded border-[#22242D] bg-[#0F1115] text-blue-500 focus:ring-blue-500 shrink-0">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -382,13 +385,13 @@
 
             <div class="flex-grow space-y-4 mb-20 overflow-y-auto">
                 <div v-for="(exercise, exIndex) in activeExercises" :key="exercise.id" class="bg-[#16171D] p-5 rounded-2xl border border-[#22242D]">
-                    <div @click="openExerciseInfo(exercise)" class="flex items-center justify-between mb-4 cursor-pointer hover:bg-[#1C1E26] p-1.5 rounded-xl transition-colors">
-                        <div class="flex items-center space-x-3">
+                    <div class="flex items-center justify-between mb-4 p-1.5 rounded-xl gap-2">
+                        <div @click="openExerciseInfo(exercise)" class="flex items-center space-x-3 min-w-0 flex-1 cursor-pointer hover:bg-[#1C1E26] rounded-xl transition-colors">
                             <div class="w-12 h-12 bg-[#0F1115] border border-[#22242D] rounded-xl overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
                                 <img v-if="exercise.thumbnailURL" :src="exercise.thumbnailURL" class="w-full h-full object-cover opacity-80" alt="Превью">
                                 <span v-else class="text-xl text-zinc-500"><i class="ri-equalizer-line"></i></span>
                             </div>
-                            <div>
+                            <div class="min-w-0">
                                 <h3 class="font-bold text-sm leading-tight text-white flex items-center capitalize">
                                     {{ exercise.name }}
                                     <span class="text-[10px] text-zinc-500 ml-2 font-normal flex items-center">
@@ -400,7 +403,12 @@
                     </div>
 
                     <!-- Сетка подходов -->
-                    <div class="space-y-3">
+                    <button @click="toggleExerciseCollapse(exercise.id)"
+                            class="w-full mb-3 bg-[#1C1E26] border border-[#22242D] text-zinc-400 hover:text-white rounded-xl py-2 text-xs font-bold flex items-center justify-center">
+                        <i :class="isExerciseCollapsed(exercise.id) ? 'ri-arrow-down-s-line' : 'ri-arrow-up-s-line'" class="mr-1"></i>
+                        {{ isExerciseCollapsed(exercise.id) ? 'Показать подходы' : 'Свернуть подходы' }}
+                    </button>
+                    <div v-if="!isExerciseCollapsed(exercise.id)" class="space-y-3">
                         <div v-for="(set, setIndex) in exercise.sets" :key="setIndex"
                              class="grid grid-cols-12 gap-2 items-center py-2.5 px-3 rounded-xl transition-colors"
                              :class="set.completed ? 'bg-blue-950/10 border border-blue-500/20' : 'bg-[#1C1E26] border border-transparent'">
@@ -437,7 +445,7 @@
                         </div>
                     </div>
 
-                    <button @click="addSet(exIndex)"
+                    <button v-if="!isExerciseCollapsed(exercise.id)" @click="addSet(exIndex)"
                             class="w-full mt-4 bg-[#1C1E26] hover:bg-[#22242D] text-zinc-300 py-2.5 rounded-xl text-xs font-semibold border border-dashed border-[#22242D] transition-all active:scale-[0.98] flex items-center justify-center">
                         <i class="ri-add-line mr-1"></i> Добавить подход
                     </button>
@@ -970,6 +978,8 @@
             });
 
             const workoutDuration = ref(0);
+            const workoutStartedAt = ref(null);
+            const collapsedExerciseIds = ref([]);
             let timerInterval = null;
             let isRestoringWorkoutDraft = false;
 
@@ -1036,12 +1046,22 @@
                 restoreActiveWorkoutDraft();
                 window.addEventListener('pagehide', saveActiveWorkoutDraft);
                 window.addEventListener('beforeunload', saveActiveWorkoutDraft);
+                document.addEventListener('visibilitychange', updateWorkoutDurationFromClock);
             });
+
+            const updateWorkoutDurationFromClock = () => {
+                if (!workoutStartedAt.value) return;
+                workoutDuration.value = Math.max(0, Math.floor((Date.now() - workoutStartedAt.value) / 1000));
+            };
 
             const startWorkoutTimer = () => {
                 if (timerInterval) clearInterval(timerInterval);
+                if (!workoutStartedAt.value) {
+                    workoutStartedAt.value = Date.now();
+                }
+                updateWorkoutDurationFromClock();
                 timerInterval = setInterval(() => {
-                    workoutDuration.value++;
+                    updateWorkoutDurationFromClock();
                     saveActiveWorkoutDraft();
                 }, 1000);
             };
@@ -1054,12 +1074,14 @@
                 const draft = {
                     version: 1,
                     savedAt: Date.now(),
+                    workoutStartedAt: workoutStartedAt.value,
                     workoutName: workoutName.value,
                     workoutDuration: workoutDuration.value,
                     selectedProgramId: selectedProgramId.value,
                     activeProgram: activeProgram.value,
                     activeTemplate: activeTemplate.value,
                     previewExercises: previewExercises.value,
+                    collapsedExerciseIds: collapsedExerciseIds.value,
                     activeExercises: activeExercises.value
                 };
 
@@ -1086,8 +1108,10 @@
                     activeProgram.value = draft.activeProgram || null;
                     activeTemplate.value = draft.activeTemplate || null;
                     previewExercises.value = draft.previewExercises || [];
+                    collapsedExerciseIds.value = draft.collapsedExerciseIds || [];
                     activeExercises.value = draft.activeExercises;
-                    workoutDuration.value = (draft.workoutDuration || 0) + Math.floor(Math.max(0, ageMs) / 1000);
+                    workoutStartedAt.value = draft.workoutStartedAt || (Date.now() - ((draft.workoutDuration || 0) * 1000) - ageMs);
+                    updateWorkoutDurationFromClock();
                     activeTab.value = 'workouts';
                     workoutSubScreen.value = 'active_workout';
                     startWorkoutTimer();
@@ -1513,6 +1537,18 @@
                 }
             };
 
+            const shareProgram = (program) => {
+                const programUrl = `https://t.me/Gym_Tracker_app_bot?start=program_${program.id}`;
+                const text = `Забирай мою программу "${program.name}" в GymTracker`;
+                const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(programUrl)}&text=${encodeURIComponent(text)}`;
+
+                if (tg) {
+                    tg.openTelegramLink(shareUrl);
+                } else {
+                    prompt("Ссылка на программу:", programUrl);
+                }
+            };
+
             const loadHistoryData = async () => {
                 loadingHistory.value = true;
                 try {
@@ -1745,6 +1781,7 @@
                 activeExercises.value = [];
                 workoutSubScreen.value = 'active_workout';
                 selectedProgramId.value = programId;
+                collapsedExerciseIds.value = [];
 
                 let latestSetsMap = {};
                 try {
@@ -1784,7 +1821,7 @@
                             };
                         });
                     } else {
-                        const defaultWeight = ex.type === 'BODYWEIGHT' ? 0 : 60;
+                        const defaultWeight = 0;
                         sets = Array.from({ length: targetSetCount }, () => ({
                             weight: defaultWeight,
                             reps: 10,
@@ -1801,6 +1838,7 @@
                     };
                 });
 
+                workoutStartedAt.value = Date.now();
                 workoutDuration.value = 0;
                 startWorkoutTimer();
                 saveActiveWorkoutDraft();
@@ -1826,6 +1864,16 @@
 
             const toggleSet = (exIndex, setIndex) => {
                 activeExercises.value[exIndex].sets[setIndex].completed = !activeExercises.value[exIndex].sets[setIndex].completed;
+            };
+
+            const isExerciseCollapsed = (exerciseId) => {
+                return collapsedExerciseIds.value.includes(exerciseId);
+            };
+
+            const toggleExerciseCollapse = (exerciseId) => {
+                collapsedExerciseIds.value = isExerciseCollapsed(exerciseId)
+                    ? collapsedExerciseIds.value.filter(id => id !== exerciseId)
+                    : [...collapsedExerciseIds.value, exerciseId];
             };
 
             const calculateWorkoutSummary = () => {
@@ -1912,6 +1960,7 @@
             };
 
             const finishWorkout = async () => {
+                updateWorkoutDurationFromClock();
                 const incompleteExercises = getIncompleteExercises();
                 if (incompleteExercises.length > 0) {
                     incompleteWorkoutWarning.value = incompleteExercises;
@@ -1959,6 +2008,8 @@
                     clearActiveWorkoutDraft();
                     activeExercises.value = [];
                     workoutDuration.value = 0;
+                    workoutStartedAt.value = null;
+                    collapsedExerciseIds.value = [];
                     selectedProgramId.value = null;
                     workoutSubScreen.value = 'menu';
                 } catch (error) {
@@ -2078,6 +2129,8 @@
                 startTemplateWorkout,
                 addSet,
                 toggleSet,
+                isExerciseCollapsed,
+                toggleExerciseCollapse,
                 finishWorkout,
                 closeCompletionSummary,
                 deleteProgram,
@@ -2097,6 +2150,7 @@
                 totalTrainingTime,
                 sendFriendRequest,
                 shareInviteLink,
+                shareProgram,
                 openFriendProfile,
                 isAchievementEarned,
                 acceptIncomingRequest,
