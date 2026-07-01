@@ -11,15 +11,20 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class ExerciseMediaService {
-    private static final String DATASET_BASE_URL = "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/";
+    private static final String EXERCISE_DB_MEDIA_BASE_URL = "https://static.exercisedb.dev/media/";
     private static final String DATASET_HOST = "raw.githubusercontent.com";
+    private static final String EXERCISE_DB_MEDIA_HOST = "static.exercisedb.dev";
     private static final String DATASET_PATH_PREFIX = "/hasaneyldrm/exercises-dataset/main/";
     private static final String MEDIA_PATH_PATTERN = "^(images|videos)/[A-Za-z0-9._-]+\\.(jpg|jpeg|png|gif|webp)$";
+    private static final Pattern LEGACY_MEDIA_ID_PATTERN = Pattern.compile("^(?:images|videos)/\\d+-([A-Za-z0-9]+)\\.(?:jpg|jpeg|png|gif|webp)$");
 
     private final Path mediaRoot;
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -61,7 +66,7 @@ public class ExerciseMediaService {
             saveToLocalCache(localPath, bytes);
             return new MediaResource(bytes, contentType);
         } catch (Exception e) {
-            throw new RuntimeException("Cannot load exercise media", e);
+            return fallbackSvg();
         }
     }
 
@@ -69,7 +74,7 @@ public class ExerciseMediaService {
         if (path != null && !path.isBlank()) {
             String cleanPath = normalizePath(path);
             validateMediaPath(cleanPath);
-            return new ResolvedMedia(cleanPath, URI.create(DATASET_BASE_URL + cleanPath));
+            return toExerciseDbMedia(cleanPath);
         }
 
         if (url == null || url.isBlank()) {
@@ -77,15 +82,34 @@ public class ExerciseMediaService {
         }
 
         URI uri = URI.create(url);
-        if (!"https".equalsIgnoreCase(uri.getScheme())
-                || !DATASET_HOST.equalsIgnoreCase(uri.getHost())
-                || !uri.getPath().startsWith(DATASET_PATH_PREFIX)) {
+        if (!"https".equalsIgnoreCase(uri.getScheme())) {
             throw new RuntimeException("Exercise media source is not allowed");
         }
 
-        String cleanPath = normalizePath(uri.getPath().substring(DATASET_PATH_PREFIX.length()));
-        validateMediaPath(cleanPath);
-        return new ResolvedMedia(cleanPath, URI.create(DATASET_BASE_URL + cleanPath));
+        if (DATASET_HOST.equalsIgnoreCase(uri.getHost()) && uri.getPath().startsWith(DATASET_PATH_PREFIX)) {
+            String cleanPath = normalizePath(uri.getPath().substring(DATASET_PATH_PREFIX.length()));
+            validateMediaPath(cleanPath);
+            return toExerciseDbMedia(cleanPath);
+        }
+
+        if (EXERCISE_DB_MEDIA_HOST.equalsIgnoreCase(uri.getHost())) {
+            String mediaId = normalizePath(uri.getPath()).replaceFirst("^media/", "").replaceFirst("\\.[^.]+$", "");
+            validateMediaId(mediaId);
+            return new ResolvedMedia(cachePathForMediaId(mediaId), URI.create(EXERCISE_DB_MEDIA_BASE_URL + mediaId + ".gif"));
+        }
+
+        throw new RuntimeException("Exercise media source is not allowed");
+    }
+
+    private ResolvedMedia toExerciseDbMedia(String legacyPath) {
+        Matcher matcher = LEGACY_MEDIA_ID_PATTERN.matcher(legacyPath);
+        if (!matcher.matches()) {
+            throw new RuntimeException("Exercise media path is invalid");
+        }
+
+        String mediaId = matcher.group(1);
+        validateMediaId(mediaId);
+        return new ResolvedMedia(cachePathForMediaId(mediaId), URI.create(EXERCISE_DB_MEDIA_BASE_URL + mediaId + ".gif"));
     }
 
     private String normalizePath(String value) {
@@ -96,6 +120,16 @@ public class ExerciseMediaService {
         if (!path.matches(MEDIA_PATH_PATTERN)) {
             throw new RuntimeException("Exercise media path is invalid");
         }
+    }
+
+    private void validateMediaId(String mediaId) {
+        if (mediaId == null || !mediaId.matches("^[A-Za-z0-9]+$")) {
+            throw new RuntimeException("Exercise media id is invalid");
+        }
+    }
+
+    private String cachePathForMediaId(String mediaId) {
+        return "videos/" + mediaId + ".gif";
     }
 
     private Path resolveLocalPath(String path) {
@@ -127,6 +161,18 @@ public class ExerciseMediaService {
             return "image/webp";
         }
         return MediaType.IMAGE_JPEG_VALUE;
+    }
+
+    private MediaResource fallbackSvg() {
+        String svg = """
+                <svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+                  <rect width="160" height="160" rx="24" fill="#111827"/>
+                  <circle cx="80" cy="62" r="24" fill="#1d4ed8" opacity=".22"/>
+                  <path d="M42 94h76M52 94V74M108 94V74M64 74h32" stroke="#60a5fa" stroke-width="8" stroke-linecap="round"/>
+                  <text x="80" y="124" text-anchor="middle" fill="#94a3b8" font-family="Arial, sans-serif" font-size="14" font-weight="700">GYMTRACKER</text>
+                </svg>
+                """;
+        return new MediaResource(svg.getBytes(StandardCharsets.UTF_8), "image/svg+xml");
     }
 
     public record MediaResource(byte[] bytes, String contentType) {
