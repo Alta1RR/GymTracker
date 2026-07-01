@@ -22,9 +22,13 @@ public class ExerciseMediaController {
     public ResponseEntity<byte[]> getExerciseMedia(@RequestParam(value = "path", required = false) String path,
                                                    @RequestParam(value = "url", required = false) String url) {
         ExerciseMediaService.MediaResource media = exerciseMediaService.load(path, url);
+        CacheControl cacheControl = "image/svg+xml".equals(media.contentType())
+                ? CacheControl.noStore()
+                : CacheControl.maxAge(1, TimeUnit.DAYS).cachePublic();
+
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(media.contentType()))
-                .cacheControl(CacheControl.maxAge(1, TimeUnit.DAYS).cachePublic())
+                .cacheControl(cacheControl)
                 .body(media.bytes());
     }
 }

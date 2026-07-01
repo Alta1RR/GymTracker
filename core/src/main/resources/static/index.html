@@ -1401,19 +1401,26 @@
                 return dict[cat.toLowerCase()] || cat;
             };
 
+            const MEDIA_CACHE_VERSION = '20260701-2';
+
+            const appendMediaVersion = (url) => {
+                const separator = url.includes('?') ? '&' : '?';
+                return `${url}${separator}mv=${MEDIA_CACHE_VERSION}`;
+            };
+
             const mediaUrl = (source) => {
                 if (!source) return "";
 
                 if (source.startsWith('/exercise-media')) {
-                    return source;
+                    return source.includes('mv=') ? source : appendMediaVersion(source);
                 }
 
                 if (source.startsWith('images/') || source.startsWith('videos/')) {
-                    return `/exercise-media?path=${encodeURIComponent(source)}`;
+                    return appendMediaVersion(`/exercise-media?path=${encodeURIComponent(source)}`);
                 }
 
                 if (source.startsWith('https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/')) {
-                    return `/exercise-media?url=${encodeURIComponent(source)}`;
+                    return appendMediaVersion(`/exercise-media?url=${encodeURIComponent(source)}`);
                 }
 
                 return source;
