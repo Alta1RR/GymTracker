@@ -19,12 +19,11 @@ import java.util.regex.Pattern;
 
 @Service
 public class ExerciseMediaService {
-    private static final String EXERCISE_DB_MEDIA_BASE_URL = "https://static.exercisedb.dev/media/";
+    private static final String DATASET_MEDIA_BASE_URL = "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/6bf7b87/";
     private static final String DATASET_HOST = "raw.githubusercontent.com";
-    private static final String EXERCISE_DB_MEDIA_HOST = "static.exercisedb.dev";
     private static final String DATASET_PATH_PREFIX = "/hasaneyldrm/exercises-dataset/main/";
     private static final String MEDIA_PATH_PATTERN = "^(images|videos)/[A-Za-z0-9._-]+\\.(jpg|jpeg|png|gif|webp)$";
-    private static final Pattern LEGACY_MEDIA_ID_PATTERN = Pattern.compile("^(?:images|videos)/\\d+-([A-Za-z0-9]+)\\.(?:jpg|jpeg|png|gif|webp)$");
+    private static final Pattern DATASET_RAW_PATH_PATTERN = Pattern.compile("^/hasaneyldrm/exercises-dataset/[^/]+/(images|videos)/(.+)$");
 
     private final Path mediaRoot;
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -74,7 +73,7 @@ public class ExerciseMediaService {
         if (path != null && !path.isBlank()) {
             String cleanPath = normalizePath(path);
             validateMediaPath(cleanPath);
-            return toExerciseDbMedia(cleanPath);
+            return new ResolvedMedia(cleanPath, URI.create(DATASET_MEDIA_BASE_URL + cleanPath));
         }
 
         if (url == null || url.isBlank()) {
@@ -89,27 +88,19 @@ public class ExerciseMediaService {
         if (DATASET_HOST.equalsIgnoreCase(uri.getHost()) && uri.getPath().startsWith(DATASET_PATH_PREFIX)) {
             String cleanPath = normalizePath(uri.getPath().substring(DATASET_PATH_PREFIX.length()));
             validateMediaPath(cleanPath);
-            return toExerciseDbMedia(cleanPath);
+            return new ResolvedMedia(cleanPath, URI.create(DATASET_MEDIA_BASE_URL + cleanPath));
         }
 
-        if (EXERCISE_DB_MEDIA_HOST.equalsIgnoreCase(uri.getHost())) {
-            String mediaId = normalizePath(uri.getPath()).replaceFirst("^media/", "").replaceFirst("\\.[^.]+$", "");
-            validateMediaId(mediaId);
-            return new ResolvedMedia(cachePathForMediaId(mediaId), URI.create(EXERCISE_DB_MEDIA_BASE_URL + mediaId + ".gif"));
+        if (DATASET_HOST.equalsIgnoreCase(uri.getHost())) {
+            Matcher matcher = DATASET_RAW_PATH_PATTERN.matcher(uri.getPath());
+            if (matcher.matches()) {
+                String cleanPath = normalizePath(matcher.group(1) + "/" + matcher.group(2));
+                validateMediaPath(cleanPath);
+                return new ResolvedMedia(cleanPath, URI.create(DATASET_MEDIA_BASE_URL + cleanPath));
+            }
         }
 
         throw new RuntimeException("Exercise media source is not allowed");
-    }
-
-    private ResolvedMedia toExerciseDbMedia(String legacyPath) {
-        Matcher matcher = LEGACY_MEDIA_ID_PATTERN.matcher(legacyPath);
-        if (!matcher.matches()) {
-            throw new RuntimeException("Exercise media path is invalid");
-        }
-
-        String mediaId = matcher.group(1);
-        validateMediaId(mediaId);
-        return new ResolvedMedia(cachePathForMediaId(mediaId), URI.create(EXERCISE_DB_MEDIA_BASE_URL + mediaId + ".gif"));
     }
 
     private String normalizePath(String value) {
@@ -120,16 +111,6 @@ public class ExerciseMediaService {
         if (!path.matches(MEDIA_PATH_PATTERN)) {
             throw new RuntimeException("Exercise media path is invalid");
         }
-    }
-
-    private void validateMediaId(String mediaId) {
-        if (mediaId == null || !mediaId.matches("^[A-Za-z0-9]+$")) {
-            throw new RuntimeException("Exercise media id is invalid");
-        }
-    }
-
-    private String cachePathForMediaId(String mediaId) {
-        return "videos/" + mediaId + ".gif";
     }
 
     private Path resolveLocalPath(String path) {
