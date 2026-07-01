@@ -19,7 +19,8 @@ public class TelegramAuthFilter extends OncePerRequestFilter {
     private static final Set<String> PUBLIC_GET_PATHS = Set.of(
             "/api/workouts/exercises",
             "/api/workouts/achievements/catalog",
-            "/api/workouts/predefined"
+            "/api/workouts/predefined",
+            "/api/workouts/media"
     );
 
     private final TelegramAuthService telegramAuthService;

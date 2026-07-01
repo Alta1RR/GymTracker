@@ -2,6 +2,7 @@ package com.gymtracker.core.Controller;
 
 import com.gymtracker.core.Repository.AchievementRepository;
 import com.gymtracker.core.Repository.ExerciseRepository;
+import com.gymtracker.core.Service.ExerciseMediaService;
 import com.gymtracker.core.Service.WorkoutService;
 import com.gymtracker.core.dto.ProgramCreateRequest;
 import com.gymtracker.core.dto.ProgramUpdateRequest;
@@ -11,12 +12,15 @@ import com.gymtracker.core.dto.WorkoutSaveRequest;
 import com.gymtracker.core.dto.WorkoutSetDto;
 import com.gymtracker.core.entity.*;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.gymtracker.core.dto.FriendProfileResponse;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static com.gymtracker.core.config.TelegramAuthFilter.TELEGRAM_USER_ID_ATTRIBUTE;
 
@@ -25,11 +29,16 @@ import static com.gymtracker.core.config.TelegramAuthFilter.TELEGRAM_USER_ID_ATT
 public class WorkoutController {
 
     private final WorkoutService workoutService;
+    private final ExerciseMediaService exerciseMediaService;
     private final ExerciseRepository exerciseRepository;
     private final AchievementRepository achievementRepository;
 
-    public WorkoutController(WorkoutService workoutService, ExerciseRepository exerciseRepository, AchievementRepository achievementRepository) {
+    public WorkoutController(WorkoutService workoutService,
+                             ExerciseMediaService exerciseMediaService,
+                             ExerciseRepository exerciseRepository,
+                             AchievementRepository achievementRepository) {
         this.workoutService = workoutService;
+        this.exerciseMediaService = exerciseMediaService;
         this.exerciseRepository = exerciseRepository;
         this.achievementRepository = achievementRepository;
     }
@@ -45,6 +54,16 @@ public class WorkoutController {
     @GetMapping("/exercises")
     public ResponseEntity<List<Exercise>> getAllExercises() {
         return ResponseEntity.ok(exerciseRepository.findAll());
+    }
+
+    @GetMapping("/media")
+    public ResponseEntity<byte[]> getExerciseMedia(@RequestParam(value = "path", required = false) String path,
+                                                   @RequestParam(value = "url", required = false) String url) {
+        ExerciseMediaService.MediaResource media = exerciseMediaService.load(path, url);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(media.contentType()))
+                .cacheControl(CacheControl.maxAge(1, TimeUnit.DAYS).cachePublic())
+                .body(media.bytes());
     }
 
     @PostMapping("/programs")
