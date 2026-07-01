@@ -1404,16 +1404,16 @@
             const mediaUrl = (source) => {
                 if (!source) return "";
 
-                if (source.startsWith('/api/workouts/media')) {
+                if (source.startsWith('/exercise-media')) {
                     return source;
                 }
 
                 if (source.startsWith('images/') || source.startsWith('videos/')) {
-                    return `/api/workouts/media?path=${encodeURIComponent(source)}`;
+                    return `/exercise-media?path=${encodeURIComponent(source)}`;
                 }
 
                 if (source.startsWith('https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/')) {
-                    return `/api/workouts/media?url=${encodeURIComponent(source)}`;
+                    return `/exercise-media?url=${encodeURIComponent(source)}`;
                 }
 
                 return source;

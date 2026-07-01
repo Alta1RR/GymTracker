@@ -43,7 +43,8 @@ public class TelegramAuthFilter extends OncePerRequestFilter {
             return true;
         }
 
-        return "GET".equalsIgnoreCase(request.getMethod()) && PUBLIC_GET_PATHS.contains(path);
+        return "GET".equalsIgnoreCase(request.getMethod())
+                && PUBLIC_GET_PATHS.stream().anyMatch(path::startsWith);
     }
 
     @Override
