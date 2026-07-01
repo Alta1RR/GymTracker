@@ -38,3 +38,6 @@ build/
 .env
 .env.*
 !.env.example
+
+### Exercise media cache ###
+media/

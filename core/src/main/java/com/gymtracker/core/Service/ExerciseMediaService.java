@@ -1,12 +1,16 @@
 package com.gymtracker.core.Service;
 
 import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Locale;
 
@@ -17,16 +21,29 @@ public class ExerciseMediaService {
     private static final String DATASET_PATH_PREFIX = "/hasaneyldrm/exercises-dataset/main/";
     private static final String MEDIA_PATH_PATTERN = "^(images|videos)/[A-Za-z0-9._-]+\\.(jpg|jpeg|png|gif|webp)$";
 
+    private final Path mediaRoot;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
+    public ExerciseMediaService(@Value("${exercise.media.local-root:/app/media}") String mediaRoot) {
+        this.mediaRoot = Path.of(mediaRoot).toAbsolutePath().normalize();
+    }
+
     public MediaResource load(String path, String url) {
-        URI sourceUri = resolveSourceUri(path, url);
+        ResolvedMedia resolvedMedia = resolveSource(path, url);
+        Path localPath = resolveLocalPath(resolvedMedia.path());
+        if (Files.isRegularFile(localPath) && Files.isReadable(localPath)) {
+            try {
+                return new MediaResource(Files.readAllBytes(localPath), contentTypeFromPath(localPath.toString()));
+            } catch (IOException e) {
+                throw new RuntimeException("Cannot read local exercise media", e);
+            }
+        }
 
         try {
-            HttpRequest request = HttpRequest.newBuilder(sourceUri)
+            HttpRequest request = HttpRequest.newBuilder(resolvedMedia.sourceUri())
                     .timeout(Duration.ofSeconds(15))
                     .GET()
                     .build();
@@ -38,19 +55,21 @@ public class ExerciseMediaService {
 
             String contentType = response.headers()
                     .firstValue("content-type")
-                    .orElse(contentTypeFromPath(sourceUri.getPath()));
+                    .orElse(contentTypeFromPath(resolvedMedia.path()));
 
-            return new MediaResource(response.body(), contentType);
+            byte[] bytes = response.body();
+            saveToLocalCache(localPath, bytes);
+            return new MediaResource(bytes, contentType);
         } catch (Exception e) {
             throw new RuntimeException("Cannot load exercise media", e);
         }
     }
 
-    private URI resolveSourceUri(String path, String url) {
+    private ResolvedMedia resolveSource(String path, String url) {
         if (path != null && !path.isBlank()) {
             String cleanPath = normalizePath(path);
             validateMediaPath(cleanPath);
-            return URI.create(DATASET_BASE_URL + cleanPath);
+            return new ResolvedMedia(cleanPath, URI.create(DATASET_BASE_URL + cleanPath));
         }
 
         if (url == null || url.isBlank()) {
@@ -66,7 +85,7 @@ public class ExerciseMediaService {
 
         String cleanPath = normalizePath(uri.getPath().substring(DATASET_PATH_PREFIX.length()));
         validateMediaPath(cleanPath);
-        return URI.create(DATASET_BASE_URL + cleanPath);
+        return new ResolvedMedia(cleanPath, URI.create(DATASET_BASE_URL + cleanPath));
     }
 
     private String normalizePath(String value) {
@@ -76,6 +95,23 @@ public class ExerciseMediaService {
     private void validateMediaPath(String path) {
         if (!path.matches(MEDIA_PATH_PATTERN)) {
             throw new RuntimeException("Exercise media path is invalid");
+        }
+    }
+
+    private Path resolveLocalPath(String path) {
+        Path localPath = mediaRoot.resolve(path).normalize();
+        if (!localPath.startsWith(mediaRoot)) {
+            throw new RuntimeException("Exercise media path is invalid");
+        }
+        return localPath;
+    }
+
+    private void saveToLocalCache(Path localPath, byte[] bytes) {
+        try {
+            Files.createDirectories(localPath.getParent());
+            Files.write(localPath, bytes);
+        } catch (IOException ignored) {
+            // Remote media is still returned even if the optional local cache cannot be written.
         }
     }
 
@@ -94,5 +130,8 @@ public class ExerciseMediaService {
     }
 
     public record MediaResource(byte[] bytes, String contentType) {
+    }
+
+    private record ResolvedMedia(String path, URI sourceUri) {
     }
 }

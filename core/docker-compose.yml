@@ -31,6 +31,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      EXERCISE_MEDIA_LOCAL_ROOT: /app/media
+    volumes:
+      - ./media:/app/media
     ports:
       - "${APP_PORT:-8080}:8080"
 
