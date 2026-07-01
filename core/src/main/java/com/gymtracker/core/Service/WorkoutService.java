@@ -25,6 +25,8 @@ import java.util.Optional;
 
 @Service
 public class WorkoutService {
+    private static final int MAX_USER_PROGRAMS = 50;
+
     private final AppUserRepository appUserRepository;
     private final ExerciseRepository exerciseRepository;
     private final WorkoutSetRepository workoutSetRepository;
@@ -127,6 +129,7 @@ public class WorkoutService {
     public Long createTrainingProgram(ProgramCreateRequest programCreateRequest) {
         AppUser user = appUserRepository.findByTelegramId(programCreateRequest.getTelegramId())
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден! "));
+        ensureProgramLimitNotExceeded(user);
 
         TrainingProgram trainingProgram = new TrainingProgram();
         trainingProgram.setUser(user);
@@ -238,6 +241,7 @@ public class WorkoutService {
         if (existing.isPresent()) {
             return existing.get();
         }
+        ensureProgramLimitNotExceeded(user);
 
         TrainingProgram clone = new TrainingProgram();
         clone.setUser(user);
@@ -473,6 +477,7 @@ public class WorkoutService {
         if (existing.isPresent()) {
             return existing.get();
         }
+        ensureProgramLimitNotExceeded(user);
 
         TrainingProgram clone = new TrainingProgram();
         clone.setUser(user);
@@ -501,6 +506,20 @@ public class WorkoutService {
         // Перечитываем из базы, чтобы в ответе сразу были все склонированные templates
         return trainingProgramRepository.findById(savedClone.getId()).orElse(savedClone);
     }
+
+    @Transactional
+    public void resetUserProfile(Long telegramId) {
+        AppUser user = appUserRepository.findByTelegramId(telegramId)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+
+        userAchievementRepository.deleteByUser(user);
+        friendshipRepository.deleteByAppUserOrRecipient(user, user);
+        workoutRepository.deleteByUser(user);
+        for (TrainingProgram program : trainingProgramRepository.findByUser(user)) {
+            trainingProgramRepository.delete(program);
+        }
+    }
+
     public FriendProfileResponse getFriendProfile(Long telegramId, Long friendTelegramId) {
         AppUser user = appUserRepository.findByTelegramId(telegramId)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
@@ -537,6 +556,12 @@ public class WorkoutService {
     private void validateProgramOwner(TrainingProgram trainingProgram, Long telegramId) {
         if (trainingProgram.getUser() == null || !trainingProgram.getUser().getTelegramId().equals(telegramId)) {
             throw new RuntimeException("Нет доступа к этой программе");
+        }
+    }
+
+    private void ensureProgramLimitNotExceeded(AppUser user) {
+        if (trainingProgramRepository.countByUser(user) >= MAX_USER_PROGRAMS) {
+            throw new RuntimeException("Достигнут лимит: максимум 50 программ на профиль");
         }
     }
 

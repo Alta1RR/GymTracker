@@ -11,6 +11,7 @@ import com.gymtracker.core.dto.WorkoutSaveRequest;
 import com.gymtracker.core.dto.WorkoutSetDto;
 import com.gymtracker.core.entity.*;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.gymtracker.core.dto.FriendProfileResponse;
@@ -86,6 +87,14 @@ public class WorkoutController {
         assertAuthenticatedTelegramId(request, telegramId);
         workoutService.deleteProgram(id, telegramId);
         return ResponseEntity.ok("Program deleted successfully!");
+    }
+
+    @DeleteMapping("/profile/reset")
+    public ResponseEntity<String> resetProfile(@RequestParam("telegramId") Long telegramId,
+                                               HttpServletRequest request) {
+        assertAuthenticatedTelegramId(request, telegramId);
+        workoutService.resetUserProfile(telegramId);
+        return ResponseEntity.ok("Profile reset successfully!");
     }
 
     @PostMapping("/programs/{id}/copy")
@@ -179,7 +188,9 @@ public class WorkoutController {
     @PostMapping("/predefined/{id}/start")
     public ResponseEntity<TrainingProgram> startPredefinedProgram(
             @PathVariable("id") Long id,
-            @RequestParam("telegramId") Long telegramId) {
+            @RequestParam("telegramId") Long telegramId,
+            HttpServletRequest request) {
+        assertAuthenticatedTelegramId(request, telegramId);
         TrainingProgram program = workoutService.startPredefinedProgram(telegramId, id);
         return ResponseEntity.ok(program);
     }
@@ -200,5 +211,10 @@ public class WorkoutController {
         if (!authenticatedTelegramId.equals(telegramId)) {
             throw new RuntimeException("Telegram id mismatch");
         }
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<String> handleRuntimeException(RuntimeException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());
     }
 }

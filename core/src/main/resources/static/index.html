@@ -14,14 +14,26 @@
     <link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet" />
 
     <style>
+        html,
         body {
             font-family: 'Inter', sans-serif;
+            background: #0F1115;
+            min-height: 100dvh;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        #app {
+            min-height: 100dvh;
+            padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px));
+        }
+        .bottom-nav {
+            padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
         }
     </style>
 </head>
-<body class="bg-[#0F1115] text-[#F3F4F6] antialiased pb-28">
+<body class="bg-[#0F1115] text-[#F3F4F6] antialiased">
 
-<div id="app" class="max-w-md mx-auto p-4 min-h-screen flex flex-col justify-between" v-cloak>
+<div id="app" class="max-w-md mx-auto p-4 flex flex-col justify-between" v-cloak>
 
     <!-- ================= TAB 1: WORKOUTS (MAIN MENU) ================= -->
     <div v-if="activeTab === 'workouts'" class="flex-grow flex flex-col justify-between">
@@ -71,19 +83,19 @@
             <div v-else class="space-y-6">
                 <!-- Кастомные программы -->
                 <div v-for="prog in customPrograms" :key="prog.id" class="space-y-3 bg-[#16171D] p-4 rounded-2xl border border-[#22242D]">
-                    <div class="flex justify-between items-center pb-2 border-b border-[#22242D]">
-                        <span class="text-xs text-zinc-400 uppercase tracking-wider font-extrabold flex items-center">
+                    <div class="flex justify-between items-start gap-3 pb-2 border-b border-[#22242D]">
+                        <span class="min-w-0 text-xs text-zinc-400 uppercase tracking-wider font-extrabold flex items-center leading-tight">
                             <i class="ri-folder-shield-2-line mr-1.5 text-blue-500"></i> {{ prog.name }}
                         </span>
-                        <div class="flex items-center gap-2">
-                            <button @click="shareProgram(prog)" class="text-emerald-400 hover:text-emerald-300 transition-colors text-xs font-semibold p-1 flex items-center">
-                                <i class="ri-share-forward-line mr-1"></i> Share
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button @click="shareProgram(prog)" title="Поделиться" class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:text-emerald-300 transition-colors flex items-center justify-center">
+                                <i class="ri-share-forward-line"></i>
                             </button>
-                            <button @click="openProgramEditor(prog)" class="text-blue-400 hover:text-blue-300 transition-colors text-xs font-semibold p-1 flex items-center">
-                                <i class="ri-edit-line mr-1"></i> Изменить
+                            <button @click="openProgramEditor(prog)" title="Изменить" class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:text-blue-300 transition-colors flex items-center justify-center">
+                                <i class="ri-edit-line"></i>
                             </button>
-                            <button @click="deleteProgram(prog.id, prog.name)" class="text-red-500/80 hover:text-red-400 transition-colors text-xs font-semibold p-1 flex items-center">
-                                <i class="ri-delete-bin-6-line mr-1"></i> Удалить
+                            <button @click="deleteProgram(prog.id, prog.name)" title="Удалить" class="w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500/80 hover:text-red-400 transition-colors flex items-center justify-center">
+                                <i class="ri-delete-bin-6-line"></i>
                             </button>
                         </div>
                     </div>
@@ -455,7 +467,7 @@
     </div>
 
     <!-- ================= TAB 2: REPORT ================= -->
-    <div v-if="activeTab === 'history'" class="flex-grow flex flex-col justify-between py-2 overflow-y-auto max-h-[85vh]">
+    <div v-if="activeTab === 'history'" class="flex-grow flex flex-col justify-between py-2">
         <div v-if="reportSubScreen === 'summary'" class="space-y-5">
             <div class="flex items-center space-x-2 mb-6">
                 <h2 class="text-xl font-bold tracking-tight text-white">Отчёт</h2>
@@ -603,13 +615,18 @@
     </div>
 
     <!-- ================= TAB 3: USER PROFILE ================= -->
-    <div v-if="activeTab === 'profile'" class="flex-grow flex flex-col justify-start py-4 overflow-y-auto max-h-[82vh] pr-1 space-y-6">
+    <div v-if="activeTab === 'profile'" class="flex-grow flex flex-col justify-start py-4 pr-1 space-y-6">
 
         <div class="flex justify-between items-center">
             <h2 class="text-xl font-bold tracking-tight text-white">Профиль атлета</h2>
-            <button @click="shareInviteLink" class="bg-blue-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg uppercase tracking-wider active:scale-95 shadow-md shadow-blue-500/20 flex items-center">
-                <i class="ri-share-forward-line mr-1"></i> Инвайт
-            </button>
+            <div class="flex items-center gap-2">
+                <button @click="shareInviteLink" title="Инвайт" class="w-9 h-9 rounded-xl bg-blue-600 text-white active:scale-95 shadow-md shadow-blue-500/20 flex items-center justify-center">
+                    <i class="ri-share-forward-line"></i>
+                </button>
+                <button @click="isSettingsOpen = true" title="Настройки" class="w-9 h-9 rounded-xl bg-[#16171D] border border-[#22242D] text-zinc-300 active:scale-95 flex items-center justify-center">
+                    <i class="ri-settings-3-line"></i>
+                </button>
+            </div>
         </div>
 
         <!-- КАРТОЧКА АВАТАРКИ И НИКА -->
@@ -719,7 +736,7 @@
     </div>
 
     <!-- ================= FRIEND PROFILE ================= -->
-    <div v-if="activeTab === 'friendProfile'" class="flex-grow flex flex-col justify-start py-4 overflow-y-auto max-h-[82vh] pr-1 space-y-6">
+    <div v-if="activeTab === 'friendProfile'" class="flex-grow flex flex-col justify-start py-4 pr-1 space-y-6">
 
         <div class="flex items-center justify-between">
             <button @click="switchTab('profile')" class="text-zinc-400 hover:text-white text-sm flex items-center">
@@ -809,7 +826,7 @@
     </div>
 
     <!-- ================= BOTTOM NAVIGATION TAB BAR (Исправлено: Векторная гантель SVG) ================= -->
-    <div class="fixed bottom-0 left-0 right-0 bg-[#0F1115]/95 backdrop-blur-md border-t border-[#22242D] py-4 z-40 max-w-md mx-auto shadow-2xl">
+    <div class="bottom-nav fixed bottom-0 left-0 right-0 bg-[#0F1115]/95 backdrop-blur-md border-t border-[#22242D] pt-4 z-40 max-w-md mx-auto shadow-2xl">
         <div class="flex justify-around items-center">
             <button @click="switchTab('workouts')" class="flex flex-col items-center space-y-1 focus:outline-none w-1/3">
                 <span class="transition-all flex items-center justify-center h-6">
@@ -835,6 +852,78 @@
     </div>
 
     <!-- BOTTOM SHEET ИНФО ОПИСАНИЯ (Исправлено: оптимизированный аккуратный размер гифок) -->
+    <transition name="slide-up">
+        <div v-if="noticeMessage" class="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center px-4" @click.self="noticeMessage = ''">
+            <div class="bg-[#16171D] border border-[#2A2D37] rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl">
+                <div class="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-2xl">
+                    <i class="ri-information-line"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-black text-white">{{ noticeTitle }}</h3>
+                    <p class="text-sm text-zinc-400 mt-2 leading-relaxed">{{ noticeMessage }}</p>
+                </div>
+                <button @click="noticeMessage = ''" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl active:scale-[0.99]">Понятно</button>
+            </div>
+        </div>
+    </transition>
+
+    <transition name="slide-up">
+        <div v-if="isSettingsOpen" class="fixed inset-0 bg-black/70 z-50 flex items-end justify-center" @click.self="isSettingsOpen = false">
+            <div class="bg-[#16171D] border-t border-[#22242D] rounded-t-3xl w-full max-w-md p-6 space-y-5 shadow-2xl">
+                <div class="w-12 h-1 bg-zinc-700 rounded-full mx-auto"></div>
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="text-xl font-black text-white">Настройки</h3>
+                        <p class="text-xs text-zinc-500 mt-1">Профиль, поддержка и данные аккаунта.</p>
+                    </div>
+                    <button @click="isSettingsOpen = false" class="text-zinc-500 hover:text-white bg-[#22242D] w-8 h-8 rounded-full flex items-center justify-center shrink-0">
+                        <i class="ri-close-line"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-3">
+                    <button @click="contactDeveloper" class="w-full bg-[#0F1115] border border-[#22242D] rounded-xl p-4 text-left flex items-center justify-between active:scale-[0.99]">
+                        <span>
+                            <span class="block text-sm font-bold text-white">Связь с разработчиком</span>
+                            <span class="block text-xs text-zinc-500 mt-1">@Alta1R_developer</span>
+                        </span>
+                        <i class="ri-telegram-line text-blue-400 text-xl"></i>
+                    </button>
+
+                    <button @click="confirmProfileReset" class="w-full bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-left flex items-center justify-between active:scale-[0.99]">
+                        <span>
+                            <span class="block text-sm font-bold text-red-300">Обнулить профиль</span>
+                            <span class="block text-xs text-red-200/60 mt-1">Удалит программы, историю, друзей и награды.</span>
+                        </span>
+                        <i class="ri-delete-bin-6-line text-red-400 text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </transition>
+
+    <transition name="slide-up">
+        <div v-if="resetConfirmOpen" class="fixed inset-0 bg-black/75 z-[60] flex items-center justify-center px-4" @click.self="resetConfirmOpen = false">
+            <div class="bg-[#16171D] border border-[#2A2D37] rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl">
+                <div class="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center text-2xl">
+                    <i class="ri-error-warning-line"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-black text-white">Обнулить профиль?</h3>
+                    <p class="text-sm text-zinc-400 mt-2 leading-relaxed">
+                        Это удалит все твои программы, историю тренировок, друзей и достижения. Действие нельзя отменить.
+                    </p>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <button @click="resetConfirmOpen = false" class="bg-[#22242D] text-zinc-200 font-bold py-3 rounded-xl active:scale-[0.99]">Отмена</button>
+                    <button @click="resetProfile" :disabled="resettingProfile" class="bg-red-600 text-white font-bold py-3 rounded-xl active:scale-[0.99] disabled:opacity-60">
+                        {{ resettingProfile ? 'Сброс...' : 'Обнулить' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </transition>
+
     <transition name="slide-up">
         <div v-if="isInfoOpen" class="fixed inset-0 bg-black/60 z-50 flex items-end justify-center" @click.self="isInfoOpen = false">
             <div class="bg-[#16171D] border-t border-[#22242D] rounded-t-3xl w-full max-w-md p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[85vh]">
@@ -1018,6 +1107,11 @@
             const selectedExercise = ref(null);
             const completionSummary = ref(null);
             const incompleteWorkoutWarning = ref(null);
+            const isSettingsOpen = ref(false);
+            const resetConfirmOpen = ref(false);
+            const resettingProfile = ref(false);
+            const noticeTitle = ref("");
+            const noticeMessage = ref("");
 
             const searchQuery = ref("");
             const filterCategory = ref("");
@@ -1549,6 +1643,49 @@
                 }
             };
 
+            const showNotice = (title, message) => {
+                noticeTitle.value = title;
+                noticeMessage.value = message;
+            };
+
+            const contactDeveloper = () => {
+                const developerUrl = 'https://t.me/Alta1R_developer';
+                if (tg) {
+                    tg.openTelegramLink(developerUrl);
+                } else {
+                    window.open(developerUrl, '_blank');
+                }
+            };
+
+            const confirmProfileReset = () => {
+                resetConfirmOpen.value = true;
+            };
+
+            const resetProfile = async () => {
+                if (resettingProfile.value) return;
+                resettingProfile.value = true;
+                try {
+                    await axios.delete('/api/workouts/profile/reset', {
+                        params: { telegramId: telegramId.value }
+                    });
+                    customPrograms.value = [];
+                    workoutHistory.value = [];
+                    friends.value = [];
+                    pendingRequests.value = [];
+                    earnedAchievements.value = [];
+                    selectedFriendProfile.value = null;
+                    resetConfirmOpen.value = false;
+                    isSettingsOpen.value = false;
+                    activeTab.value = 'profile';
+                    alert('Профиль обнулен.');
+                } catch (error) {
+                    console.error('Ошибка сброса профиля:', error);
+                    alert(error?.response?.data || 'Не удалось обнулить профиль.');
+                } finally {
+                    resettingProfile.value = false;
+                }
+            };
+
             const loadHistoryData = async () => {
                 loadingHistory.value = true;
                 try {
@@ -1576,7 +1713,13 @@
                         })).data;
                     } catch (error) {
                         console.error("Не удалось начать предустановленную программу:", error);
-                        alert("Не удалось загрузить программу, попробуй ещё раз.");
+                        if (error?.response?.status === 401) {
+                            showNotice("Сессия устарела", "Telegram не подтвердил сессию. Закрой мини-приложение полностью и открой его заново из бота.");
+                        } else if ((error?.response?.status === 400 || error?.response?.status === 500) && String(error?.response?.data || '').includes('50')) {
+                            showNotice("Лимит программ", "Достигнут лимит: максимум 50 программ на профиль.");
+                        } else {
+                            showNotice("Не удалось загрузить программу", "Попробуй закрыть мини-приложение и открыть его заново.");
+                        }
                         return;
                     }
                 }
@@ -1760,7 +1903,7 @@
                     workoutSubScreen.value = 'templates';
                 } catch (error) {
                     console.error("Ошибка создания:", error);
-                    alert("Произошла ошибка при сохранении!");
+                    alert(error?.response?.data || "Произошла ошибка при сохранении!");
                 }
             };
 
@@ -2091,6 +2234,11 @@
                 selectedExercise,
                 completionSummary,
                 incompleteWorkoutWarning,
+                isSettingsOpen,
+                resetConfirmOpen,
+                resettingProfile,
+                noticeTitle,
+                noticeMessage,
                 searchQuery,
                 filterCategory,
                 filterEquipment,
@@ -2151,6 +2299,9 @@
                 sendFriendRequest,
                 shareInviteLink,
                 shareProgram,
+                contactDeveloper,
+                confirmProfileReset,
+                resetProfile,
                 openFriendProfile,
                 isAchievementEarned,
                 acceptIncomingRequest,

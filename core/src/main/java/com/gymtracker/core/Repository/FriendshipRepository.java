@@ -19,4 +19,6 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
 
     // Найти все одобренные запросы, где я был получателем
     List<Friendship> findByRecipientAndStatus(AppUser recipient, FriendshipStatus status);
+
+    void deleteByAppUserOrRecipient(AppUser appUser, AppUser recipient);
 }

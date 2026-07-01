@@ -12,6 +12,8 @@ import java.util.Optional;
 public interface TrainingProgramRepository extends JpaRepository<TrainingProgram, Long> {
     List<TrainingProgram> findByUser(AppUser user);
 
+    long countByUser(AppUser user);
+
     List<TrainingProgram> findByUserIsNull();
 
     Optional<TrainingProgram> findByUserAndName(AppUser user, String name);

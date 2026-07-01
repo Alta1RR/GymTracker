@@ -28,6 +28,8 @@ public interface WorkoutRepository extends JpaRepository<Workout, Long> {
 
     Long countByUser(AppUser user);
 
+    void deleteByUser(AppUser user);
+
     @Query("SELECT COALESCE(SUM(w.durationInSeconds), 0) FROM Workout w WHERE w.user = :user")
     Long sumDurationInSecondsByUser(@Param("user") AppUser user);
 }

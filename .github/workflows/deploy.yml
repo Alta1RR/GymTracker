@@ -27,3 +27,20 @@ jobs:
             cd core
             docker compose up -d --build
             docker image prune -f
+
+      - name: Notify Telegram chat
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_RELEASE_CHAT_ID: ${{ secrets.TELEGRAM_RELEASE_CHAT_ID }}
+          RELEASE_MESSAGE: ${{ github.event.head_commit.message }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_RELEASE_CHAT_ID" ]; then
+            echo "Telegram release notification skipped: secrets are not configured."
+            exit 0
+          fi
+          MESSAGE=$(printf 'GymTracker update deployed.\n\nAdded/changed:\n%s\n\nVersion: %s' "$RELEASE_MESSAGE" "$RELEASE_SHA")
+          curl -sS "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_RELEASE_CHAT_ID}" \
+            --data-urlencode "text=${MESSAGE}" \
+            || echo "Telegram release notification failed."
