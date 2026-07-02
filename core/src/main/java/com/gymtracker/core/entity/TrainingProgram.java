@@ -28,6 +28,7 @@ public class TrainingProgram {
     @JoinColumn(name = "user_id")
     private AppUser user;
 
-    @OneToMany(mappedBy = "trainingProgram", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "trainingProgram", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OrderBy("id ASC")
     private List<WorkoutTemplate> templates;
 }

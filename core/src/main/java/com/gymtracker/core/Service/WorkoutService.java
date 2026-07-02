@@ -142,6 +142,7 @@ public class WorkoutService {
 
     }
 
+    @Transactional
     public void addTemplateToProgram(Long programId, Long telegramId, TemplateCreateRequest templateCreateRequest) {
         TrainingProgram trainingProgram = trainingProgramRepository.findById(programId)
                 .orElseThrow(() -> new RuntimeException("Программа не найдена"));
@@ -154,7 +155,11 @@ public class WorkoutService {
         WorkoutTemplate savedTemplate = workoutTemplateRepository.save(workoutTemplate);
 
         int order = 1;
+        Set<Long> usedExerciseIds = new HashSet<>();
         for (Long exerciseId : templateCreateRequest.getExerciseIds()) {
+            if (!usedExerciseIds.add(exerciseId)) {
+                continue;
+            }
             Exercise exercise = exerciseRepository.findById(exerciseId)
                     .orElseThrow(() -> new RuntimeException("Упражнение не найдено"));
 
@@ -184,32 +189,49 @@ public class WorkoutService {
         validateProgramOwner(template.getTrainingProgram(), request.getTelegramId());
 
         template.setName(request.getName());
-        WorkoutTemplate savedTemplate = workoutTemplateRepository.save(template);
-
-        List<TemplateExercise> oldExercises = templateExerciseRepository.findByWorkoutTemplate(savedTemplate);
-        templateExerciseRepository.deleteAll(oldExercises);
+        if (template.getTemplates() != null) {
+            template.getTemplates().clear();
+            workoutTemplateRepository.flush();
+        } else {
+            List<TemplateExercise> oldExercises = templateExerciseRepository.findByWorkoutTemplate(template);
+            templateExerciseRepository.deleteAllInBatch(oldExercises);
+            templateExerciseRepository.flush();
+        }
 
         int order = 1;
-        for (TemplateExerciseUpdateRequest item : request.getExercises()) {
+        Set<Long> usedExerciseIds = new HashSet<>();
+        List<TemplateExerciseUpdateRequest> requestedExercises =
+                request.getExercises() == null ? List.of() : request.getExercises();
+        for (TemplateExerciseUpdateRequest item : requestedExercises) {
+            if (!usedExerciseIds.add(item.getExerciseId())) {
+                continue;
+            }
             Exercise exercise = exerciseRepository.findById(item.getExerciseId())
                     .orElseThrow(() -> new RuntimeException("Упражнение не найдено"));
 
             TemplateExercise templateExercise = new TemplateExercise();
-            templateExercise.setWorkoutTemplate(savedTemplate);
+            templateExercise.setWorkoutTemplate(template);
             templateExercise.setExercise(exercise);
             templateExercise.setSequenceOrder(order++);
             templateExercise.setTargetSets(item.getTargetSets() == null || item.getTargetSets() < 1 ? 1 : item.getTargetSets());
             templateExerciseRepository.save(templateExercise);
         }
 
-        return workoutTemplateRepository.findById(templateId).orElse(savedTemplate);
+        templateExerciseRepository.flush();
+        return workoutTemplateRepository.findById(templateId).orElse(template);
     }
 
+    @Transactional
     public void deleteTemplate(Long templateId, Long telegramId) {
         WorkoutTemplate template = workoutTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new RuntimeException("Тренировочный день не найден"));
         validateProgramOwner(template.getTrainingProgram(), telegramId);
+        if (template.getTemplates() != null) {
+            template.getTemplates().clear();
+            workoutTemplateRepository.flush();
+        }
         workoutTemplateRepository.delete(template);
+        workoutTemplateRepository.flush();
     }
 
     public List<TrainingProgram> getProgramsByUserId(Long telegramId) {

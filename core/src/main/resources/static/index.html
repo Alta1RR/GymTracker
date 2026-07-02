@@ -1196,6 +1196,7 @@
 
             const isAddingDayOnly = ref(false);
             const selectedProgramId = ref(null);
+            const addDayReturnProgramId = ref(null);
 
             const activeProgram = ref(null);
             const activeTemplate = ref(null);
@@ -1574,7 +1575,7 @@
             const loadPredefinedTemplates = async () => {
                 try {
                     const response = await axios.get('/api/workouts/predefined');
-                    predefinedTemplates.value = response.data;
+                    predefinedTemplates.value = (response.data || []).map(normalizeProgramResponse);
                 } catch (error) {
                     console.error("Ошибка загрузки стандартных тренировок из базы:", error);
                 }
@@ -1659,6 +1660,36 @@
 
             const isAchievementEarned = (achievementId) => {
                 return earnedAchievements.value.includes(achievementId);
+            };
+
+            const normalizeTemplateResponse = (template) => {
+                const seenExercises = new Set();
+                return {
+                    ...template,
+                    templates: (template.templates || [])
+                        .slice()
+                        .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0))
+                        .filter(item => {
+                            const exerciseId = item.exercise?.id;
+                            if (!exerciseId || seenExercises.has(exerciseId)) return false;
+                            seenExercises.add(exerciseId);
+                            return true;
+                        })
+                };
+            };
+
+            const normalizeProgramResponse = (program) => {
+                const seenTemplates = new Set();
+                return {
+                    ...program,
+                    templates: (program.templates || [])
+                        .filter(template => {
+                            if (!template.id || seenTemplates.has(template.id)) return false;
+                            seenTemplates.add(template.id);
+                            return true;
+                        })
+                        .map(normalizeTemplateResponse)
+                };
             };
 
             const syncProfile = async () => {
@@ -1901,7 +1932,7 @@
                     const response = await axios.get('/api/workouts/programs', {
                         params: { telegramId: telegramId.value }
                     });
-                    customPrograms.value = response.data;
+                    customPrograms.value = (response.data || []).map(normalizeProgramResponse);
                 } catch (error) {
                     console.error("Ошибка загрузки программ:", error);
                 } finally {
@@ -1937,13 +1968,25 @@
                     id: template.id,
                     name: template.name,
                     exerciseSearch: "",
-                    items: (template.templates || []).map(item => ({
-                        localId: `${template.id}-${item.exercise.id}-${item.sequenceOrder}`,
-                        exercise: item.exercise,
-                        targetSets: item.targetSets || 3
-                    }))
+                    items: uniqueTemplateItems(template)
                 }));
                 workoutSubScreen.value = 'edit_program';
+            };
+
+            const uniqueTemplateItems = (template) => {
+                const uniqueItems = new Map();
+                (template.templates || [])
+                    .slice()
+                    .sort((a, b) => (a.sequenceOrder || 0) - (b.sequenceOrder || 0))
+                    .forEach(item => {
+                        if (!item.exercise || uniqueItems.has(item.exercise.id)) return;
+                        uniqueItems.set(item.exercise.id, {
+                            localId: `${template.id}-${item.exercise.id}-${item.id || item.sequenceOrder || Date.now()}`,
+                            exercise: item.exercise,
+                            targetSets: item.targetSets || 3
+                        });
+                    });
+                return Array.from(uniqueItems.values());
             };
 
             const filteredEditingExercises = (template) => {
@@ -2040,6 +2083,7 @@
             const openConstructor = () => {
                 isAddingDayOnly.value = false;
                 selectedProgramId.value = null;
+                addDayReturnProgramId.value = null;
                 newProgramName.value = "";
                 newTemplateName.value = "";
                 selectedExerciseIds.value = [];
@@ -2056,6 +2100,7 @@
             const openAddDayOnly = (program) => {
                 isAddingDayOnly.value = true;
                 selectedProgramId.value = program.id;
+                addDayReturnProgramId.value = workoutSubScreen.value === 'edit_program' ? program.id : null;
                 newTemplateName.value = "";
                 selectedExerciseIds.value = [];
                 searchQuery.value = "";
@@ -2088,8 +2133,18 @@
                         isAddingDayOnly.value ? "День добавлен" : "Программа создана",
                         isAddingDayOnly.value ? "Новый тренировочный день успешно добавлен." : "Программа тренировок успешно создана."
                     );
-                    loadCustomPrograms();
-                    workoutSubScreen.value = 'menu';
+                    await loadCustomPrograms();
+                    if (isAddingDayOnly.value && addDayReturnProgramId.value) {
+                        const updated = customPrograms.value.find(p => p.id === addDayReturnProgramId.value);
+                        if (updated) {
+                            openProgramEditor(updated);
+                        } else {
+                            workoutSubScreen.value = 'templates';
+                        }
+                    } else {
+                        workoutSubScreen.value = 'menu';
+                    }
+                    addDayReturnProgramId.value = null;
                 } catch (error) {
                     console.error("Ошибка создания:", error);
                     showError(error?.response?.data || "Произошла ошибка при сохранении.");

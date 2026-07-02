@@ -22,6 +22,7 @@ public class WorkoutTemplate {
     @JoinColumn(name = "program_id", nullable = true)
     private TrainingProgram trainingProgram;
 
-    @OneToMany(mappedBy = "workoutTemplate", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "workoutTemplate", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OrderBy("sequenceOrder ASC")
     private List<TemplateExercise> templates;
 }
