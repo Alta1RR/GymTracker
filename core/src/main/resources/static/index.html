@@ -82,6 +82,19 @@
 
             <div v-else class="space-y-6">
                 <!-- Кастомные программы -->
+                <div v-if="customPrograms.length === 0" class="bg-[#16171D] border border-dashed border-[#2A2D37] rounded-2xl p-6 text-center space-y-4">
+                    <div class="w-14 h-14 rounded-2xl bg-blue-500/10 text-blue-400 mx-auto flex items-center justify-center text-3xl">
+                        <i class="ri-folder-add-line"></i>
+                    </div>
+                    <div>
+                        <div class="text-base font-black text-white">Своих программ пока нет</div>
+                        <p class="text-xs text-zinc-500 mt-2 leading-relaxed">Создай свой цикл или начни с рекомендованной программы ниже.</p>
+                    </div>
+                    <button @click="openConstructor" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl text-xs active:scale-[0.99]">
+                        <i class="ri-add-line mr-1"></i> Создать программу
+                    </button>
+                </div>
+
                 <div v-for="prog in customPrograms" :key="prog.id" class="space-y-3 bg-[#16171D] p-4 rounded-2xl border border-[#22242D]">
                     <div class="flex justify-between items-start gap-3 pb-2 border-b border-[#22242D]">
                         <span class="min-w-0 text-xs text-zinc-400 uppercase tracking-wider font-extrabold flex items-center leading-tight">
@@ -141,6 +154,10 @@
 
                 <!-- Рекомендуемые стандартные программы (Вариант Б - Только для чтения) -->
                 <div class="text-xs text-zinc-500 uppercase tracking-wider font-bold mt-8 mb-2 px-1">Рекомендуемые программы</div>
+                <div v-if="predefinedTemplates.length === 0" class="bg-[#16171D] border border-dashed border-[#2A2D37] rounded-2xl p-5 text-center">
+                    <div class="text-sm font-bold text-zinc-300">Рекомендованные программы пока не загружены</div>
+                    <p class="text-xs text-zinc-500 mt-2">Можно создать свою программу вручную.</p>
+                </div>
                 <div v-for="prog in predefinedTemplates" :key="prog.id" class="space-y-3 bg-[#16171D] p-4 rounded-2xl border border-[#22242D]">
                     <div class="flex justify-between items-center pb-2 border-b border-[#22242D]">
                         <span class="text-xs text-blue-400 uppercase tracking-wider font-extrabold flex items-center">
@@ -172,7 +189,7 @@
         <!-- SUB-SCREEN: CONSTRUCTOR -->
         <div v-if="workoutSubScreen === 'constructor'" class="py-2">
             <div class="flex items-center space-x-2 mb-6">
-                <button @click="workoutSubScreen = 'templates'" class="text-zinc-400 hover:text-white text-sm flex items-center">
+                <button @click="closeConstructor" class="text-zinc-400 hover:text-white text-sm flex items-center">
                     <i class="ri-arrow-left-line mr-1"></i> Отмена
                 </button>
             </div>
@@ -282,6 +299,30 @@
                     </button>
                 </div>
 
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <div class="text-xs uppercase tracking-wider text-zinc-500 font-bold">Тренировочные дни</div>
+                        <div class="text-[10px] text-zinc-600 mt-1">{{ editingTemplates.length }} в программе</div>
+                    </div>
+                    <button @click="openAddDayOnly(editingProgram)"
+                            class="bg-[#1C1E26] border border-[#22242D] text-zinc-200 rounded-xl px-3 py-2 text-xs font-bold active:scale-[0.99]">
+                        <i class="ri-add-line mr-1"></i> День
+                    </button>
+                </div>
+
+                <div v-if="editingTemplates.length === 0" class="bg-[#16171D] border border-dashed border-[#2A2D37] rounded-2xl p-6 text-center space-y-3">
+                    <div class="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 mx-auto flex items-center justify-center text-2xl">
+                        <i class="ri-calendar-plus-line"></i>
+                    </div>
+                    <div>
+                        <div class="text-sm font-black text-white">В программе пока нет дней</div>
+                        <p class="text-xs text-zinc-500 mt-1">Добавь первый тренировочный день и выбери упражнения.</p>
+                    </div>
+                    <button @click="openAddDayOnly(editingProgram)" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl text-xs active:scale-[0.99]">
+                        Добавить день
+                    </button>
+                </div>
+
                 <div v-for="template in editingTemplates" :key="template.id" class="bg-[#16171D] border border-[#22242D] rounded-2xl p-4 space-y-4">
                     <div class="flex items-center justify-between gap-3">
                         <input type="text" v-model="template.name"
@@ -310,16 +351,34 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-[1fr_auto] gap-2">
-                        <select v-model="template.exerciseToAdd"
-                                class="bg-[#0F1115] border border-[#22242D] rounded-xl px-3 py-2.5 text-xs text-zinc-300 focus:outline-none focus:border-blue-500 min-w-0">
-                            <option :value="null">Добавить упражнение</option>
-                            <option v-for="ex in allExercises" :key="ex.id" :value="ex.id">{{ ex.name }}</option>
-                        </select>
-                        <button @click="addExerciseToEditingTemplate(template)"
-                                class="bg-[#1C1E26] hover:bg-[#22242D] text-zinc-300 px-4 rounded-xl border border-[#22242D]">
-                            <i class="ri-add-line"></i>
-                        </button>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-[10px] text-zinc-500 uppercase font-bold tracking-wider mb-2">Добавить упражнение</label>
+                            <input type="text" v-model="template.exerciseSearch"
+                                   placeholder="Начни вводить: жим, тяга, присед..."
+                                   class="w-full bg-[#0F1115] border border-[#22242D] rounded-xl px-3 py-2.5 text-xs text-zinc-300 focus:outline-none focus:border-blue-500">
+                        </div>
+
+                        <div class="bg-[#0F1115] border border-[#22242D] rounded-xl divide-y divide-[#22242D] max-h-72 overflow-y-auto">
+                            <button v-for="ex in filteredEditingExercises(template)" :key="ex.id"
+                                    @click="addExerciseToEditingTemplate(template, ex)"
+                                    class="w-full p-3 flex items-center gap-3 text-left active:bg-[#1C1E26]">
+                                <div class="w-14 h-14 bg-[#16171D] border border-[#22242D] rounded-xl overflow-hidden flex items-center justify-center shrink-0">
+                                    <img v-if="ex.thumbnailURL || ex.imageURL" :src="mediaUrl(ex.thumbnailURL || ex.imageURL)" class="w-full h-full object-cover" alt="Превью">
+                                    <i v-else class="ri-image-line text-zinc-600"></i>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="text-sm font-bold text-white leading-tight line-clamp-2 capitalize">{{ ex.name }}</div>
+                                    <div class="text-[10px] text-zinc-500 mt-1 truncate">{{ translateCategory(ex.category) }} • {{ ex.equipment }}</div>
+                                </div>
+                                <span class="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                                    <i class="ri-add-line"></i>
+                                </span>
+                            </button>
+                            <div v-if="filteredEditingExercises(template).length === 0" class="p-4 text-center text-xs text-zinc-500">
+                                Нет упражнений для добавления
+                            </div>
+                        </div>
                     </div>
 
                     <button @click="saveEditingTemplate(template)"
@@ -666,11 +725,13 @@
             <div class="space-y-3">
                 <div v-for="req in pendingRequests" :key="req.id" class="flex items-center justify-between bg-[#16171D] p-3 rounded-xl border border-[#22242D]">
                     <div class="flex items-center space-x-3 overflow-hidden">
-                        <div class="w-8 h-8 rounded-full overflow-hidden border border-[#22242D] flex items-center justify-center bg-blue-500/10 text-blue-500 font-bold text-xs uppercase shrink-0">
-                            <span>{{ req.telegramUserName ? req.telegramUserName.charAt(0) : 'А' }}</span>
+                        <div class="w-9 h-9 rounded-full overflow-hidden border border-[#22242D] flex items-center justify-center text-white font-black text-xs uppercase shrink-0"
+                             :class="avatarClass(req)">
+                            <img v-if="req.photoUrl" :src="req.photoUrl" class="w-full h-full object-cover" alt="Avatar">
+                            <span v-else>{{ userInitial(req) }}</span>
                         </div>
                         <div class="overflow-hidden">
-                            <div class="text-xs font-bold text-white truncate">{{ req.telegramUserName || 'Атлет' }}</div>
+                            <div class="text-xs font-bold text-white truncate">{{ userDisplayName(req) }}</div>
                             <p class="text-[9px] text-zinc-600 truncate">ID: {{ req.telegramId }}</p>
                         </div>
                     </div>
@@ -708,13 +769,24 @@
                     <i class="ri-group-line mr-1.5 text-sm"></i> Мои Друзья ({{ friends.length }})
                 </h4>
                 <div class="flex space-x-1.5">
-                    <button @click="sendFriendRequest" class="text-[10px] text-blue-500 font-bold hover:underline flex items-center">
-                        <i class="ri-user-add-line mr-0.5"></i> Добавить
+                    <button @click="shareInviteLink" class="text-[10px] text-blue-500 font-bold hover:underline flex items-center">
+                        <i class="ri-user-add-line mr-0.5"></i> Пригласить
                     </button>
                 </div>
             </div>
             <div v-if="loadingFriends" class="text-center text-zinc-600 text-xs py-2">Загрузка друзей...</div>
-            <div v-else-if="friends.length === 0" class="text-zinc-500 text-[10px] py-2 text-center leading-relaxed">У тебя пока нет друзей. Отправь инвайт-ссылку бро, чтобы следить за его прогрессом!</div>
+            <div v-else-if="friends.length === 0" class="bg-[#0F1115] border border-dashed border-[#2A2D37] rounded-2xl p-5 text-center space-y-3">
+                <div class="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 mx-auto flex items-center justify-center text-2xl">
+                    <i class="ri-team-line"></i>
+                </div>
+                <div>
+                    <div class="text-sm font-black text-white">Друзей пока нет</div>
+                    <p class="text-xs text-zinc-500 mt-1 leading-relaxed">Отправь ссылку-приглашение. Когда человек зайдёт по ней, у тебя появится входящий запрос.</p>
+                </div>
+                <button @click="shareInviteLink" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl text-xs active:scale-[0.99]">
+                    <i class="ri-share-forward-line mr-1"></i> Поделиться ссылкой
+                </button>
+            </div>
             <div v-else class="space-y-3 max-h-40 overflow-y-auto pr-1 mt-2">
                 <button
                     v-for="friend in friends"
@@ -722,11 +794,13 @@
                     @click="openFriendProfile(friend)"
                     class="w-full flex items-center space-x-3 bg-[#1C1E26] hover:bg-[#22242D] p-2.5 rounded-xl border border-[#22242D] text-left transition-all active:scale-[0.99]"
                 >
-                    <div class="w-8 h-8 rounded-full overflow-hidden border border-[#22242D] flex items-center justify-center bg-blue-500/10 text-blue-500 font-bold text-xs uppercase shrink-0">
-                        <span>{{ friend.telegramUserName ? friend.telegramUserName.charAt(0) : 'А' }}</span>
+                    <div class="w-9 h-9 rounded-full overflow-hidden border border-[#22242D] flex items-center justify-center text-white font-black text-xs uppercase shrink-0"
+                         :class="avatarClass(friend)">
+                        <img v-if="friend.photoUrl" :src="friend.photoUrl" class="w-full h-full object-cover" alt="Avatar">
+                        <span v-else>{{ userInitial(friend) }}</span>
                     </div>
                     <div class="flex-grow overflow-hidden">
-                        <div class="text-xs font-bold text-white truncate">{{ friend.telegramUserName || 'Атлет' }}</div>
+                        <div class="text-xs font-bold text-white truncate">{{ userDisplayName(friend) }}</div>
                         <p class="text-[9px] text-zinc-600 truncate">ID: {{ friend.telegramId }}</p>
                     </div>
                     <i class="ri-arrow-right-s-line text-zinc-500 text-lg"></i>
@@ -751,14 +825,14 @@
 
         <template v-else-if="selectedFriendProfile">
             <div class="bg-[#16171D] border border-[#22242D] rounded-2xl p-5 flex items-center space-x-4 shadow-sm">
-                <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-blue-500 flex items-center justify-center bg-blue-500/10 shrink-0">
-                    <span class="text-2xl font-black text-blue-500 uppercase">
-                        {{ selectedFriendProfile.friend.telegramUserName ? selectedFriendProfile.friend.telegramUserName.charAt(0) : 'А' }}
-                    </span>
+                <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-blue-500 flex items-center justify-center text-white shrink-0"
+                     :class="avatarClass(selectedFriendProfile.friend)">
+                    <img v-if="selectedFriendProfile.friend.photoUrl" :src="selectedFriendProfile.friend.photoUrl" class="w-full h-full object-cover" alt="Avatar">
+                    <span v-else class="text-2xl font-black uppercase">{{ userInitial(selectedFriendProfile.friend) }}</span>
                 </div>
                 <div class="overflow-hidden">
                     <h3 class="text-lg font-black text-white leading-tight truncate">
-                        {{ selectedFriendProfile.friend.telegramUserName || 'Атлет' }}
+                        {{ userDisplayName(selectedFriendProfile.friend) }}
                     </h3>
                     <p class="text-[10px] text-zinc-600 mt-0.5 truncate">
                         ID: {{ selectedFriendProfile.friend.telegramId }}
@@ -863,6 +937,30 @@
                     <p class="text-sm text-zinc-400 mt-2 leading-relaxed">{{ noticeMessage }}</p>
                 </div>
                 <button @click="noticeMessage = ''" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl active:scale-[0.99]">Понятно</button>
+            </div>
+        </div>
+    </transition>
+
+    <transition name="slide-up">
+        <div v-if="confirmDialog" class="fixed inset-0 bg-black/75 z-[75] flex items-center justify-center px-4" @click.self="closeConfirmDialog">
+            <div class="bg-[#16171D] border border-[#2A2D37] rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-2xl">
+                <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl"
+                     :class="confirmDialog.danger ? 'bg-red-500/10 border border-red-500/20 text-red-400' : 'bg-blue-500/10 border border-blue-500/20 text-blue-400'">
+                    <i :class="confirmDialog.danger ? 'ri-error-warning-line' : 'ri-question-line'"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-black text-white">{{ confirmDialog.title }}</h3>
+                    <p class="text-sm text-zinc-400 mt-2 leading-relaxed">{{ confirmDialog.message }}</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <button @click="closeConfirmDialog" class="bg-[#22242D] text-zinc-200 font-bold py-3 rounded-xl active:scale-[0.99]">
+                        {{ confirmDialog.cancelText || 'Отмена' }}
+                    </button>
+                    <button @click="runConfirmDialog" class="text-white font-bold py-3 rounded-xl active:scale-[0.99]"
+                            :class="confirmDialog.danger ? 'bg-red-600' : 'bg-blue-600'">
+                        {{ confirmDialog.confirmText || 'OK' }}
+                    </button>
+                </div>
             </div>
         </div>
     </transition>
@@ -1112,6 +1210,7 @@
             const resettingProfile = ref(false);
             const noticeTitle = ref("");
             const noticeMessage = ref("");
+            const confirmDialog = ref(null);
 
             const searchQuery = ref("");
             const filterCategory = ref("");
@@ -1132,6 +1231,7 @@
                         telegramUser.value = tg.initDataUnsafe.user.first_name || "Атлет";
                         telegramUsername.value = tg.initDataUnsafe.user.username || "gym_athlete";
                         tgUserPhoto.value = tg.initDataUnsafe.user.photo_url || null;
+                        syncProfile();
                     }
                 }
                 fetchAllExercises();
@@ -1508,7 +1608,7 @@
             const openProgramTemplate = (program, template, templateIndex) => {
                 const status = getTemplateStatus(program, template, templateIndex);
                 if (status === 'done') {
-                    alert("Эта тренировка уже выполнена на текущей неделе. Выбери день, который подсвечен как следующий.");
+                    showNotice("Тренировка уже закрыта", "Эта тренировка уже выполнена на текущей неделе. Выбери день, который подсвечен как следующий.");
                     return;
                 }
 
@@ -1561,6 +1661,39 @@
                 return earnedAchievements.value.includes(achievementId);
             };
 
+            const syncProfile = async () => {
+                try {
+                    await axios.post('/api/workouts/profile/sync', {
+                        telegramId: telegramId.value,
+                        telegramUserName: telegramUser.value || telegramUsername.value || "Атлет",
+                        photoUrl: tgUserPhoto.value
+                    });
+                } catch (error) {
+                    console.error("Ошибка синхронизации профиля:", error);
+                }
+            };
+
+            const userDisplayName = (user) => {
+                return user?.telegramUserName || "Атлет";
+            };
+
+            const userInitial = (user) => {
+                return userDisplayName(user).trim().charAt(0) || "А";
+            };
+
+            const avatarClass = (user) => {
+                const palette = [
+                    "bg-blue-600",
+                    "bg-indigo-600",
+                    "bg-emerald-600",
+                    "bg-cyan-600",
+                    "bg-rose-600",
+                    "bg-violet-600"
+                ];
+                const seed = Number(user?.telegramId || user?.id || 0);
+                return palette[Math.abs(seed) % palette.length];
+            };
+
             const loadFriendsData = async () => {
                 loadingFriends.value = true;
                 try {
@@ -1588,45 +1721,10 @@
                     selectedFriendProfile.value = response.data;
                 } catch (error) {
                     console.error("Ошибка загрузки профиля друга:", error);
-                    alert("Не удалось открыть профиль друга.");
+                    showError("Не удалось открыть профиль друга.");
                     switchTab('profile');
                 } finally {
                     loadingFriendProfile.value = false;
-                }
-            };
-
-            const sendFriendRequest = async () => {
-                const recipientId = prompt("Введи Telegram ID твоего друга для отправки запроса:");
-                if (!recipientId) return;
-                try {
-                    await axios.post('/api/workouts/friends/request', null, {
-                        params: {
-                            requesterId: telegramId.value,
-                            recipientId: recipientId
-                        }
-                    });
-                    alert("Запрос на дружбу успешно отправлен!");
-                } catch (error) {
-                    console.error(error);
-                    alert("Ошибка отправки запроса! Проверь ID.");
-                }
-            };
-
-            const acceptFriendRequest = async () => {
-                const requesterId = prompt("Введи Telegram ID пользователя, чей запрос ты хочешь принять:");
-                if (!requesterId) return;
-                try {
-                    await axios.post('/api/workouts/friends/accept', null, {
-                        params: {
-                            requesterId: requesterId,
-                            recipientId: telegramId.value
-                        }
-                    });
-                    alert("Запрос принят! Вы теперь друзья.");
-                    loadFriendsData();
-                } catch (error) {
-                    console.error(error);
-                    alert("Запрос не найден или уже одобрен.");
                 }
             };
 
@@ -1638,21 +1736,22 @@
                             recipientId: telegramId.value
                         }
                     });
-                    alert(`Вы теперь друзья с ${reqUser.telegramUserName || 'Атлетом'}!`);
+                    showNotice("Запрос принят", `Вы теперь друзья с ${reqUser.telegramUserName || 'Атлетом'}.`);
                     loadPendingRequests();
                     loadFriendsData();
                 } catch (error) {
                     console.error(error);
-                    alert("Ошибка принятия запроса!");
+                    showError("Ошибка принятия запроса.");
                 }
             };
 
             const shareInviteLink = () => {
+                const directInviteUrl = `https://t.me/Gym_Tracker_app_bot?start=ref_${telegramId.value}`;
                 if (tg) {
-                    const inviteUrl = `https://t.me/share/url?url=https://t.me/Gym_Tracker_app_bot?start=ref_${telegramId.value}&text=Бро, залетай в GymTracker Pro! Это дневник тренировок, который сам считает веса и ведет статистику. Давай тренить вместе!`;
+                    const inviteUrl = `https://t.me/share/url?url=${encodeURIComponent(directInviteUrl)}&text=Бро, залетай в GymTracker Pro! Это дневник тренировок, который сам считает веса и ведет статистику. Давай тренить вместе!`;
                     tg.openTelegramLink(inviteUrl);
                 } else {
-                    prompt("Скопируй эту инвайт-ссылку и отправь другу:", `https://t.me/Gym_Tracker_app_bot?start=ref_${telegramId.value}`);
+                    copyShareLink(directInviteUrl, "Ссылка-приглашение скопирована");
                 }
             };
 
@@ -1664,13 +1763,43 @@
                 if (tg) {
                     tg.openTelegramLink(shareUrl);
                 } else {
-                    prompt("Ссылка на программу:", programUrl);
+                    copyShareLink(programUrl, "Ссылка на программу скопирована");
+                }
+            };
+
+            const copyShareLink = async (url, successTitle) => {
+                try {
+                    await navigator.clipboard.writeText(url);
+                    showNotice(successTitle, "Теперь ее можно отправить в любой чат.");
+                } catch (error) {
+                    console.error("Ошибка копирования ссылки:", error);
+                    showNotice("Ссылка готова", url);
                 }
             };
 
             const showNotice = (title, message) => {
                 noticeTitle.value = title;
                 noticeMessage.value = message;
+            };
+
+            const showError = (message) => {
+                showNotice("Не получилось", message);
+            };
+
+            const askConfirm = ({ title, message, confirmText = "OK", cancelText = "Отмена", danger = false, onConfirm }) => {
+                confirmDialog.value = { title, message, confirmText, cancelText, danger, onConfirm };
+            };
+
+            const closeConfirmDialog = () => {
+                confirmDialog.value = null;
+            };
+
+            const runConfirmDialog = async () => {
+                const action = confirmDialog.value?.onConfirm;
+                confirmDialog.value = null;
+                if (action) {
+                    await action();
+                }
             };
 
             const contactDeveloper = () => {
@@ -1702,10 +1831,10 @@
                     resetConfirmOpen.value = false;
                     isSettingsOpen.value = false;
                     activeTab.value = 'profile';
-                    alert('Профиль обнулен.');
+                    showNotice("Профиль обнулен", "Данные профиля очищены.");
                 } catch (error) {
                     console.error('Ошибка сброса профиля:', error);
-                    alert(error?.response?.data || 'Не удалось обнулить профиль.');
+                    showError(error?.response?.data || 'Не удалось обнулить профиль.');
                 } finally {
                     resettingProfile.value = false;
                 }
@@ -1781,19 +1910,24 @@
             };
 
             const deleteProgram = async (programId, programName) => {
-                if (!confirm(`Ты уверен, что хочешь безвозвратно удалить программу "${programName}"?`)) {
-                    return;
-                }
-                try {
-                    await axios.delete(`/api/workouts/programs/${programId}`, {
-                        params: { telegramId: telegramId.value }
-                    });
-                    alert("Программа успешно удалена!");
-                    loadCustomPrograms();
-                } catch (error) {
-                    console.error("Ошибка удаления:", error);
-                    alert("Не удалось удалить программу!");
-                }
+                askConfirm({
+                    title: "Удалить программу?",
+                    message: `Ты уверен, что хочешь безвозвратно удалить программу "${programName}"?`,
+                    confirmText: "Удалить",
+                    danger: true,
+                    onConfirm: async () => {
+                        try {
+                            await axios.delete(`/api/workouts/programs/${programId}`, {
+                                params: { telegramId: telegramId.value }
+                            });
+                            showNotice("Программа удалена", "Программа успешно удалена.");
+                            loadCustomPrograms();
+                        } catch (error) {
+                            console.error("Ошибка удаления:", error);
+                            showError("Не удалось удалить программу.");
+                        }
+                    }
+                });
             };
 
             const openProgramEditor = (program) => {
@@ -1802,7 +1936,7 @@
                 editingTemplates.value = (program.templates || []).map(template => ({
                     id: template.id,
                     name: template.name,
-                    exerciseToAdd: null,
+                    exerciseSearch: "",
                     items: (template.templates || []).map(item => ({
                         localId: `${template.id}-${item.exercise.id}-${item.sequenceOrder}`,
                         exercise: item.exercise,
@@ -1810,6 +1944,21 @@
                     }))
                 }));
                 workoutSubScreen.value = 'edit_program';
+            };
+
+            const filteredEditingExercises = (template) => {
+                const query = (template.exerciseSearch || "").toLowerCase().trim();
+                const existingIds = new Set(template.items.map(item => item.exercise.id));
+
+                return allExercises.value
+                    .filter(ex => !existingIds.has(ex.id))
+                    .filter(ex => {
+                        if (!query) return true;
+                        return [ex.name, ex.category, ex.equipment]
+                            .filter(Boolean)
+                            .some(value => String(value).toLowerCase().includes(query));
+                    })
+                    .slice(0, 30);
             };
 
             const saveProgramName = async () => {
@@ -1823,21 +1972,23 @@
                     if (updated) openProgramEditor(updated);
                 } catch (error) {
                     console.error("Ошибка сохранения программы:", error);
-                    alert("Не удалось сохранить название программы.");
+                    showError("Не удалось сохранить название программы.");
                 }
             };
 
-            const addExerciseToEditingTemplate = (template) => {
-                if (!template.exerciseToAdd) return;
-                const exercise = allExercises.value.find(ex => ex.id === template.exerciseToAdd);
+            const addExerciseToEditingTemplate = (template, exercise) => {
                 if (!exercise) return;
+                if (template.items.some(item => item.exercise.id === exercise.id)) {
+                    showNotice("Уже добавлено", "Это упражнение уже есть в тренировочном дне.");
+                    return;
+                }
 
                 template.items.push({
                     localId: `new-${Date.now()}-${exercise.id}`,
                     exercise,
                     targetSets: 3
                 });
-                template.exerciseToAdd = null;
+                template.exerciseSearch = "";
             };
 
             const removeExerciseFromEditingTemplate = (template, localId) => {
@@ -1859,25 +2010,31 @@
                     if (updated) openProgramEditor(updated);
                 } catch (error) {
                     console.error("Ошибка сохранения дня:", error);
-                    alert("Не удалось сохранить тренировочный день.");
+                    showError("Не удалось сохранить тренировочный день.");
                 }
             };
 
             const deleteEditingTemplate = async (template) => {
-                if (!confirm(`Удалить тренировочный день "${template.name}"?`)) return;
-
-                try {
-                    await axios.delete(`/api/workouts/templates/${template.id}`, {
-                        params: { telegramId: telegramId.value }
-                    });
-                    await loadCustomPrograms();
-                    const updated = customPrograms.value.find(p => p.id === editingProgram.value.id);
-                    if (updated) openProgramEditor(updated);
-                    else workoutSubScreen.value = 'templates';
-                } catch (error) {
-                    console.error("Ошибка удаления дня:", error);
-                    alert("Не удалось удалить тренировочный день.");
-                }
+                askConfirm({
+                    title: "Удалить день?",
+                    message: `Удалить тренировочный день "${template.name}"?`,
+                    confirmText: "Удалить",
+                    danger: true,
+                    onConfirm: async () => {
+                        try {
+                            await axios.delete(`/api/workouts/templates/${template.id}`, {
+                                params: { telegramId: telegramId.value }
+                            });
+                            await loadCustomPrograms();
+                            const updated = customPrograms.value.find(p => p.id === editingProgram.value.id);
+                            if (updated) openProgramEditor(updated);
+                            else workoutSubScreen.value = 'templates';
+                        } catch (error) {
+                            console.error("Ошибка удаления дня:", error);
+                            showError("Не удалось удалить тренировочный день.");
+                        }
+                    }
+                });
             };
 
             const openConstructor = () => {
@@ -1890,6 +2047,10 @@
                 filterCategory.value = "";
                 filterEquipment.value = "";
                 workoutSubScreen.value = 'constructor';
+            };
+
+            const closeConstructor = () => {
+                workoutSubScreen.value = 'menu';
             };
 
             const openAddDayOnly = (program) => {
@@ -1923,12 +2084,15 @@
                         params: { telegramId: telegramId.value }
                     });
 
-                    alert(isAddingDayOnly.value ? "Новый день успешно добавлен!" : "Программа тренировок успешно создана!");
+                    showNotice(
+                        isAddingDayOnly.value ? "День добавлен" : "Программа создана",
+                        isAddingDayOnly.value ? "Новый тренировочный день успешно добавлен." : "Программа тренировок успешно создана."
+                    );
                     loadCustomPrograms();
-                    workoutSubScreen.value = 'templates';
+                    workoutSubScreen.value = 'menu';
                 } catch (error) {
                     console.error("Ошибка создания:", error);
-                    alert(error?.response?.data || "Произошла ошибка при сохранении!");
+                    showError(error?.response?.data || "Произошла ошибка при сохранении.");
                 }
             };
 
@@ -2182,7 +2346,7 @@
                     workoutSubScreen.value = 'menu';
                 } catch (error) {
                     console.error("Ошибка сохранения:", error);
-                    alert("Ошибка!");
+                    showError("Не удалось сохранить тренировку.");
                 }
             };
 
@@ -2264,6 +2428,7 @@
                 resettingProfile,
                 noticeTitle,
                 noticeMessage,
+                confirmDialog,
                 searchQuery,
                 filterCategory,
                 filterEquipment,
@@ -2288,12 +2453,16 @@
                 pendingRequests,
                 translateCategory,
                 mediaUrl,
+                closeConfirmDialog,
+                runConfirmDialog,
                 openTemplatesScreen,
                 getTemplateStatus,
                 openProgramTemplate,
                 openConstructor,
+                closeConstructor,
                 openProgramEditor,
                 saveProgramName,
+                filteredEditingExercises,
                 addExerciseToEditingTemplate,
                 removeExerciseFromEditingTemplate,
                 saveEditingTemplate,
@@ -2316,13 +2485,15 @@
                 formatDate,
                 formatDurationMinutes,
                 getGroupedExercises,
+                userDisplayName,
+                userInitial,
+                avatarClass,
 
                 // Добавленные методы визуализации и недостающие биндинги
                 getInitials,
                 getBadgeBg,
                 totalWorkoutsCount,
                 totalTrainingTime,
-                sendFriendRequest,
                 shareInviteLink,
                 shareProgram,
                 contactDeveloper,
@@ -2331,7 +2502,6 @@
                 openFriendProfile,
                 isAchievementEarned,
                 acceptIncomingRequest,
-                acceptFriendRequest,
                 activeProgram,
                 activeTemplate,
                 previewExercises,

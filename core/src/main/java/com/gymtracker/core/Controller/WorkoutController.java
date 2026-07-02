@@ -4,6 +4,7 @@ import com.gymtracker.core.Repository.AchievementRepository;
 import com.gymtracker.core.Repository.ExerciseRepository;
 import com.gymtracker.core.Service.WorkoutService;
 import com.gymtracker.core.dto.ProgramCreateRequest;
+import com.gymtracker.core.dto.ProfileSyncRequest;
 import com.gymtracker.core.dto.ProgramUpdateRequest;
 import com.gymtracker.core.dto.TemplateCreateRequest;
 import com.gymtracker.core.dto.TemplateUpdateRequest;
@@ -97,6 +98,14 @@ public class WorkoutController {
         assertAuthenticatedTelegramId(request, telegramId);
         workoutService.resetUserProfile(telegramId);
         return ResponseEntity.ok("Profile reset successfully!");
+    }
+
+    @PostMapping("/profile/sync")
+    public ResponseEntity<String> syncProfile(@RequestBody ProfileSyncRequest profileSyncRequest,
+                                              HttpServletRequest request) {
+        assertAuthenticatedTelegramId(request, profileSyncRequest.getTelegramId());
+        workoutService.syncUserProfile(profileSyncRequest);
+        return ResponseEntity.ok("Profile synced successfully!");
     }
 
     @PostMapping("/programs/{id}/copy")
@@ -200,7 +209,9 @@ public class WorkoutController {
     @GetMapping("/friends/{friendTelegramId}/profile")
     public ResponseEntity<FriendProfileResponse> getFriendProfile(
             @RequestParam("telegramId") Long telegramId,
-            @PathVariable("friendTelegramId") Long friendTelegramId) {
+            @PathVariable("friendTelegramId") Long friendTelegramId,
+            HttpServletRequest request) {
+        assertAuthenticatedTelegramId(request, telegramId);
         return ResponseEntity.ok(workoutService.getFriendProfile(telegramId, friendTelegramId));
     }
 

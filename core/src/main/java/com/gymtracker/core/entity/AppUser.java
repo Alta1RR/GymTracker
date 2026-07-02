@@ -20,6 +20,8 @@ public class AppUser {
 
     private String telegramUserName;
 
+    private String photoUrl;
+
     @CreationTimestamp
     private LocalDateTime dateOfRegistration;
 

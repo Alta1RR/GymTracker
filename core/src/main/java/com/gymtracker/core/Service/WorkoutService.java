@@ -2,6 +2,7 @@ package com.gymtracker.core.Service;
 
 import com.gymtracker.core.Repository.*;
 import com.gymtracker.core.dto.ProgramCreateRequest;
+import com.gymtracker.core.dto.ProfileSyncRequest;
 import com.gymtracker.core.dto.ProgramUpdateRequest;
 import com.gymtracker.core.dto.TemplateCreateRequest;
 import com.gymtracker.core.dto.TemplateExerciseUpdateRequest;
@@ -18,10 +19,12 @@ import com.gymtracker.core.dto.FriendProfileResponse;
 import com.gymtracker.core.entity.enums.AchievementTrigger;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class WorkoutService {
@@ -62,8 +65,7 @@ public class WorkoutService {
 
     @Transactional
     public void setWorkout(WorkoutSaveRequest workoutSaveRequest) {
-        AppUser user = appUserRepository.findByTelegramId(workoutSaveRequest.getTelegramId())
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден! "));
+        AppUser user = getOrCreateUser(workoutSaveRequest.getTelegramId());
 
         Workout workout = new Workout();
         workout.setUser(user);
@@ -127,8 +129,7 @@ public class WorkoutService {
     }
 
     public Long createTrainingProgram(ProgramCreateRequest programCreateRequest) {
-        AppUser user = appUserRepository.findByTelegramId(programCreateRequest.getTelegramId())
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден! "));
+        AppUser user = getOrCreateUser(programCreateRequest.getTelegramId());
         ensureProgramLimitNotExceeded(user);
 
         TrainingProgram trainingProgram = new TrainingProgram();
@@ -212,8 +213,7 @@ public class WorkoutService {
     }
 
     public List<TrainingProgram> getProgramsByUserId(Long telegramId) {
-        AppUser user = appUserRepository.findByTelegramId(telegramId)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+        AppUser user = getOrCreateUser(telegramId);
         return trainingProgramRepository.findByUser(user);
     }
 
@@ -367,17 +367,18 @@ public class WorkoutService {
     }
     // Метод получения истории тренировок
     public List<Workout> getWorkoutHistory(Long telegramId) {
-        AppUser user = appUserRepository.findByTelegramId(telegramId)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+        AppUser user = getOrCreateUser(telegramId);
         return workoutRepository.findByUserOrderByDateDesc(user);
     }
 
     @Transactional
     public void sendFriendRequest(Long requesterId, Long recipientId) {
-        AppUser requester = appUserRepository.findByTelegramId(requesterId)
-                .orElseThrow(() -> new RuntimeException("Отправитель не найден"));
-        AppUser recipient = appUserRepository.findByTelegramId(recipientId)
-                .orElseThrow(() -> new RuntimeException("Получатель не найден"));
+        if (requesterId.equals(recipientId)) {
+            throw new RuntimeException("Нельзя добавить самого себя в друзья");
+        }
+
+        AppUser requester = getOrCreateUser(requesterId);
+        AppUser recipient = getOrCreateUser(recipientId);
 
         // Проверяем, нет ли уже такого запроса в обе стороны (чтобы не дублировать)
         if (friendshipRepository.findByAppUserAndRecipient(requester, recipient).isPresent() ||
@@ -397,8 +398,7 @@ public class WorkoutService {
     public void acceptFriendRequest(Long requesterId, Long recipientId) {
         AppUser requester = appUserRepository.findByTelegramId(requesterId)
                 .orElseThrow(() -> new RuntimeException("Отправитель не найден"));
-        AppUser recipient = appUserRepository.findByTelegramId(recipientId)
-                .orElseThrow(() -> new RuntimeException("Получатель не найден"));
+        AppUser recipient = getOrCreateUser(recipientId);
 
         // Ищем зависший запрос
         Friendship friendship = friendshipRepository.findByAppUserAndRecipient(requester, recipient)
@@ -408,43 +408,57 @@ public class WorkoutService {
         friendshipRepository.save(friendship);
     }
 
+    @Transactional
     public List<AppUser> getFriends(Long telegramId) {
-        AppUser user = appUserRepository.findByTelegramId(telegramId)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
-
-        List<AppUser> friends = new ArrayList<>();
+        AppUser user = getOrCreateUser(telegramId);
+        Map<Long, AppUser> friends = new LinkedHashMap<>();
+        Set<Long> seenFriendIds = new HashSet<>();
 
         // Добавляем тех, кому я отправил запрос и они одобрили
         List<Friendship> sent = friendshipRepository.findByAppUserAndStatus(user, FriendshipStatus.ACCEPTED);
         for (Friendship f : sent) {
-            friends.add(f.getRecipient());
+            Long friendId = f.getRecipient().getTelegramId();
+            if (!seenFriendIds.add(friendId)) {
+                friendshipRepository.delete(f);
+                continue;
+            }
+            friends.put(friendId, f.getRecipient());
         }
 
         // Добавляем тех, кто мне отправил запрос и я одобрил
         List<Friendship> received = friendshipRepository.findByRecipientAndStatus(user, FriendshipStatus.ACCEPTED);
         for (Friendship f : received) {
-            friends.add(f.getAppUser());
+            Long friendId = f.getAppUser().getTelegramId();
+            if (!seenFriendIds.add(friendId)) {
+                friendshipRepository.delete(f);
+                continue;
+            }
+            friends.put(friendId, f.getAppUser());
         }
 
-        return friends;
+        return new ArrayList<>(friends.values());
     }
 
     public List<UserAchievement> getEarnedAchievements(Long telegramId) {
-        AppUser user = appUserRepository.findByTelegramId(telegramId)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+        AppUser user = getOrCreateUser(telegramId);
         return userAchievementRepository.findByUser(user);
     }
 
+    @Transactional
     public List<AppUser> getPendingRequests(Long telegramId) {
-        AppUser user = appUserRepository.findByTelegramId(telegramId)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+        AppUser user = getOrCreateUser(telegramId);
 
         List<Friendship> pending = friendshipRepository.findByRecipientAndStatus(user, FriendshipStatus.PENDING);
-        List<AppUser> requesters = new ArrayList<>();
+        Map<Long, AppUser> requesters = new LinkedHashMap<>();
         for (Friendship f : pending) {
-            requesters.add(f.getAppUser()); // забираем отправителя
+            Long requesterId = f.getAppUser().getTelegramId();
+            if (requesters.containsKey(requesterId)) {
+                friendshipRepository.delete(f);
+                continue;
+            }
+            requesters.put(requesterId, f.getAppUser()); // забираем отправителя
         }
-        return requesters;
+        return new ArrayList<>(requesters.values());
     }
 
     public List<WorkoutTemplate> getPredefinedTemplates() {
@@ -461,8 +475,7 @@ public class WorkoutService {
     // свой вес), мы клонируем её в отдельную строку, принадлежащую этому юзеру.
     @Transactional
     public TrainingProgram startPredefinedProgram(Long telegramId, Long presetProgramId) {
-        AppUser user = appUserRepository.findByTelegramId(telegramId)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+        AppUser user = getOrCreateUser(telegramId);
 
         TrainingProgram preset = trainingProgramRepository.findById(presetProgramId)
                 .orElseThrow(() -> new RuntimeException("Программа не найдена"));
@@ -509,8 +522,11 @@ public class WorkoutService {
 
     @Transactional
     public void resetUserProfile(Long telegramId) {
-        AppUser user = appUserRepository.findByTelegramId(telegramId)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+        Optional<AppUser> userOptional = appUserRepository.findByTelegramId(telegramId);
+        if (userOptional.isEmpty()) {
+            return;
+        }
+        AppUser user = userOptional.get();
 
         userAchievementRepository.deleteByUser(user);
         friendshipRepository.deleteByAppUserOrRecipient(user, user);
@@ -520,9 +536,20 @@ public class WorkoutService {
         }
     }
 
+    @Transactional
+    public void syncUserProfile(ProfileSyncRequest request) {
+        AppUser user = getOrCreateUser(request.getTelegramId());
+        if (request.getTelegramUserName() != null && !request.getTelegramUserName().isBlank()) {
+            user.setTelegramUserName(request.getTelegramUserName());
+        }
+        if (request.getPhotoUrl() != null && !request.getPhotoUrl().isBlank()) {
+            user.setPhotoUrl(request.getPhotoUrl());
+        }
+        appUserRepository.save(user);
+    }
+
     public FriendProfileResponse getFriendProfile(Long telegramId, Long friendTelegramId) {
-        AppUser user = appUserRepository.findByTelegramId(telegramId)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+        AppUser user = getOrCreateUser(telegramId);
 
         AppUser friend = appUserRepository.findByTelegramId(friendTelegramId)
                 .orElseThrow(() -> new RuntimeException("Друг не найден"));
@@ -557,6 +584,16 @@ public class WorkoutService {
         if (trainingProgram.getUser() == null || !trainingProgram.getUser().getTelegramId().equals(telegramId)) {
             throw new RuntimeException("Нет доступа к этой программе");
         }
+    }
+
+    private AppUser getOrCreateUser(Long telegramId) {
+        return appUserRepository.findByTelegramId(telegramId)
+                .orElseGet(() -> {
+                    AppUser user = new AppUser();
+                    user.setTelegramId(telegramId);
+                    user.setTelegramUserName("Атлет");
+                    return appUserRepository.save(user);
+                });
     }
 
     private void ensureProgramLimitNotExceeded(AppUser user) {
